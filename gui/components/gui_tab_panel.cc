@@ -31,7 +31,6 @@ gui_tab_panel_t::gui_tab_panel_t() :
 }
 
 
-
 void gui_tab_panel_t::add_tab(gui_component_t *c, const char *name, const skin_desc_t *desc, const char *tooltip )
 {
 	tabs.append( tab(c, desc?NULL:name, desc?desc->get_image(0):NULL, tooltip) );
@@ -40,8 +39,6 @@ void gui_tab_panel_t::add_tab(gui_component_t *c, const char *name, const skin_d
 		set_size( get_size() );
 	}
 }
-
-
 
 
 void gui_tab_panel_t::set_size(scr_size size)
@@ -172,7 +169,6 @@ bool gui_tab_panel_t::infowin_event(const event_t *ev)
 }
 
 
-
 void gui_tab_panel_t::draw(scr_coord parent_pos)
 {
 	// Position in screen/window
@@ -208,7 +204,7 @@ void gui_tab_panel_t::draw(scr_coord parent_pos)
 			if (i != active_tab) {
 				// Non active tabs
 				display_fillbox_wh_clip_rgb(text_x+1, ypos+2, iter.width-2, 1, SYSCOL_HIGHLIGHT, true);
-				display_fillbox_wh_clip_rgb(text_x, ypos+required_size.h-1, iter.width-2, 1, SYSCOL_HIGHLIGHT, true);
+				display_fillbox_wh_clip_rgb(text_x, ypos+required_size.h-1, iter.width, 1, SYSCOL_HIGHLIGHT, true);
 
 				display_vline_wh_clip_rgb(text_x, ypos+3, required_size.h-4, SYSCOL_HIGHLIGHT, true);
 				display_vline_wh_clip_rgb(text_x+iter.width-1, ypos+3, required_size.h-4, SYSCOL_SHADOW, true);
