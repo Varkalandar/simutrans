@@ -51,15 +51,15 @@ bottom_window_bar_color = 3
 
 # third (best together with 2nd):use different text color for bar
 # some colors are 215-white, 240-black 208-214- all shades of gray
-front_window_text_color = #FFFFFF
-bottom_window_text_color = #C0C0C0
+front_window_text_color = #DDDDDD
+bottom_window_text_color = #BBBBBB
 
 #################################colour stuff#################################
 
-default_window_title_color = #338FCC
+default_window_title_color = #705010
 
 gui_color_text = #AAAAAA
-gui_color_text_highlight = #807010
+gui_color_text_highlight = #908010
 gui_color_text_shadow = #000000
 gui_color_text_title = #338FCC
 gui_color_text_strong = #E46A0B
@@ -68,7 +68,7 @@ gui_color_text_strong = #E46A0B
 gui_color_empty = #868c86
 gui_color_obsolete = #2878ff
 
-gui_color_edit_text = #807010
+gui_color_edit_text = #908010
 gui_color_edit_text_selected = #FAFAFA
 gui_color_edit_text_disabled = #666666
 gui_color_edit_background_selected = #72B2DD
@@ -80,7 +80,7 @@ gui_color_chart_lines_odd = #68688e
 gui_color_chart_lines_even = #68688e
 
 gui_color_list_text_selected_focus = #AAAAAA
-gui_color_list_text_selected_nofocus = #807010
+gui_color_list_text_selected_nofocus = #908010
 gui_color_list_background_selected_focus = #72B2DD
 gui_color_list_background_selected_nofocus = #72B2DD
 
@@ -88,7 +88,7 @@ gui_color_button_text = #AAAAAA
 gui_color_button_text_disabled = #666666
 gui_color_button_text_selected = #FAFAFA
 
-gui_color_colored_button_text = #CCCCCC
+gui_color_colored_button_text = #201000
 gui_color_colored_button_text_selected = #CCCCCC
 
 gui_color_checkbox_text = #AAAAAA
@@ -167,8 +167,8 @@ gui_button_height = 22
 gui_button_width = 100
 
 # text margins inside the buttons (left, top, right)
-gui_button_text_offset = 5,0,5
-gui_color_button_text_offset = 5,0,5
+gui_button_text_offset = 5,1,5
+gui_color_button_text_offset = 5,1,5
 
 # maximum size of tool bars in tools (0 = no limit)
 # if more tools than allowed by height,
