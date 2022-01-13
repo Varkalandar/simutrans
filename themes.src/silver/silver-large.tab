@@ -56,13 +56,13 @@ bottom_window_text_color = #C0C0C0
 
 #################################colour stuff#################################
 
-default_window_title_color = #338FCC
+default_window_title_color = #84939e
 
 # gui_color_text = #000000
 gui_color_text_highlight = #706000
 gui_color_text_shadow = #BDD3DF
 gui_color_text_title = #338FCC
-gui_color_text_strong = #EC6E0C
+gui_color_text_strong = #E46A0B
 
 ########Test########
 gui_color_empty = #868c86
@@ -74,10 +74,10 @@ gui_color_edit_text_disabled = #666666
 gui_color_edit_background_selected = #72B2DD
 gui_color_edit_beam = #000000
 
-gui_color_chart_background = #FAFAFA
+gui_color_chart_background = #6f6d60
 gui_color_chart_lines_zero = #005C9E
-gui_color_chart_lines_odd = #338FCC
-gui_color_chart_lines_even = #338FCC
+gui_color_chart_lines_odd = #373630
+gui_color_chart_lines_even = #373630
 
 gui_color_list_text_selected_focus = #FAFAFA
 gui_color_list_text_selected_nofocus = #FAFAFA
@@ -167,8 +167,8 @@ gui_button_height = 22
 gui_button_width = 100
 
 # text margins inside the buttons (left, top, right)
-gui_button_text_offset = 5,0,5
-gui_color_button_text_offset = 5,0,5
+gui_button_text_offset = 5,1,5
+gui_color_button_text_offset = 5,1,5
 
 # maximum size of tool bars in tools (0 = no limit)
 # if more tools than allowed by height,

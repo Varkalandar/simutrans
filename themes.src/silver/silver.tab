@@ -56,7 +56,7 @@ bottom_window_text_color = #C0C0C0
 
 #################################colour stuff#################################
 
-default_window_title_color = #338FCC
+default_window_title_color = #84939e
 
 # gui_color_text = #000000
 gui_color_text_highlight = #706000
@@ -74,10 +74,10 @@ gui_color_edit_text_disabled = #666666
 gui_color_edit_background_selected = #72B2DD
 gui_color_edit_beam = #000000
 
-gui_color_chart_background = #FAFAFA
+gui_color_chart_background = #6f6d60
 gui_color_chart_lines_zero = #005C9E
-gui_color_chart_lines_odd = #338FCC
-gui_color_chart_lines_even = #338FCC
+gui_color_chart_lines_odd = #373630
+gui_color_chart_lines_even = #373630
 
 gui_color_list_text_selected_focus = #FAFAFA
 gui_color_list_text_selected_nofocus = #FAFAFA
@@ -101,7 +101,7 @@ gui_color_ticker_divider = #6095B8
 gui_color_statusbar_background = #72B2DD
 gui_color_statusbar_divider = #6095B8
 
-gui_highlight_color = #FFFFFF7
+gui_highlight_color = #FFFFF7
 gui_shadow_color = #72726E
 
 # gui_color_text_minus = #C00000
