@@ -94,30 +94,30 @@ gui_color_colored_button_text_selected = #CCCCCC
 gui_color_checkbox_text = #AAAAAA
 gui_color_checkbox_text_disabled = #666666
 
-gui_color_ticker_background = #5E5E80
-gui_color_ticker_divider = #6095B8
+gui_color_ticker_background = #3c3c52
+gui_color_ticker_divider = #4d4d69
 
 gui_color_statusbar_text = #AAAAAA
-gui_color_statusbar_background = #5E5E80
-gui_color_statusbar_divider = #707099
+gui_color_statusbar_background = #3c3c52
+gui_color_statusbar_divider = #4d4d69
 
 gui_highlight_color = #68688e
 gui_shadow_color = #000000
 
-# gui_color_text_minus = #C00000
-# gui_color_text_plus = #000000
+gui_color_text_minus = #C07010
+gui_color_text_plus = #70C010
 gui_color_text_unused = #E46A0B
 
 # Color of cursor overlay, which is blended over marked ground tiles
-cursor_overlay_color = #ff0000
+cursor_overlay_color = #1060F0
 
 # Color loadbar, save game, load game, server...
 gui_color_loadingbar_progress = #76b9e6
 gui_color_loadingbar_inner = #D6ECF7
 
 # Color player brigth
-gui_player_color_dark = 1	
-gui_player_color_bright = 3
+gui_player_color_dark = 3
+gui_player_color_bright = 1
 
 # make the chat window transparent in network games
 gui_chat_window_network_transparency = 25
