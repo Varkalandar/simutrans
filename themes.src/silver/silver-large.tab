@@ -106,7 +106,7 @@ gui_shadow_color = #72726E
 
 # gui_color_text_minus = #C00000
 # gui_color_text_plus = #000000
-gui_color_text_unused = #E46A0B
+gui_color_text_unused = #555f66
 
 # Color of cursor overlay, which is blended over marked ground tiles
 cursor_overlay_color = #ff0000
