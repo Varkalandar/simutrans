@@ -98,8 +98,8 @@ gui_color_ticker_background = #D6ECF7
 gui_color_ticker_divider = #6095B8
 
 # gui_color_statusbar_text = #000000
-gui_color_statusbar_background = #72B2DD
-gui_color_statusbar_divider = #6095B8
+gui_color_statusbar_background = #b8b8a8
+gui_color_statusbar_divider = #f8fcf0
 
 gui_highlight_color = #FFFFF7
 gui_shadow_color = #72726E
