@@ -73,6 +73,9 @@
   <PropertyGroup Condition="'$(Configuration)'=='Stable'">
     <GenerateManifest>false</GenerateManifest>
   </PropertyGroup>
+  <PropertyGroup Label="Vcpkg" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <VcpkgHostTriplet>x86-windows-static</VcpkgHostTriplet>
+  </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -123,7 +126,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug' Or '$(Configuration)'=='Release'">
     <PreBuildEvent>
-      <Command>cscript.exe //Nologo revision.jse</Command>
+      <Command>cscript.exe //Nologo tools\revision.jse</Command>
       <Message>Obtain SVN revision number</Message>
     </PreBuildEvent>
     <ClCompile>
@@ -155,11 +158,11 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="display\simgraph16.cc" />
-    <ClCompile Include="music\w32_midi.cc" />
-    <ClCompile Include="sound\win32_sound_xa.cc" />
-    <ClCompile Include="sys\clipboard_w32.cc" />
-    <ClCompile Include="sys\simsys_w.cc" />
+    <ClCompile Include="src\simutrans\display\simgraph16.cc" />
+    <ClCompile Include="src\simutrans\music\w32_midi.cc" />
+    <ClCompile Include="src\simutrans\sound\win32_sound_xa.cc" />
+    <ClCompile Include="src\simutrans\sys\clipboard_w32.cc" />
+    <ClCompile Include="src\simutrans\sys\simsys_w.cc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

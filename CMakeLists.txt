@@ -19,8 +19,8 @@ include(SimutransVcpkgTriplet)
 
 project(simutrans LANGUAGES C CXX)
 
-# Force C++11 everywhere
-set(CMAKE_CXX_STANDARD 11)
+# Force C++14 everywhere
+set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED YES)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -33,6 +33,7 @@ if (MINGW)
 endif ()
 
 if (APPLE)
+	list(APPEND CMAKE_PREFIX_PATH "/usr/local/opt/readline")
 	link_directories(/usr/local/lib)
 	set(CMAKE_EXE_LINKER_FLAGS "-framework Cocoa")
 endif ()
@@ -79,12 +80,6 @@ endif (NOT MSVC)
 
 
 #
-# output directory
-#
-file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/simutrans)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/simutrans)
-
-#
 # sources
 #
 add_executable(simutrans MACOSX_BUNDLE)
@@ -93,6 +88,14 @@ if (NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif ()
 
 include(SimutransSourceList)
+
+
+#
+# output directory
+#
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/simutrans)
+set_target_properties( simutrans PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/simutrans/$<0:> )
+
 
 #
 # Generate revision on compile time (so only if needed)
@@ -117,34 +120,34 @@ endif ()
 target_link_libraries(simutrans PRIVATE PNG::PNG)
 
 if (WIN32)
-	target_sources(simutrans PRIVATE simres.rc)
-	target_sources(simutrans PRIVATE sys/clipboard_w32.cc)
+	target_sources(simutrans PRIVATE src/Windows/simres.rc)
+	target_sources(simutrans PRIVATE src/simutrans/sys/clipboard_w32.cc)
 	target_link_libraries(simutrans PRIVATE ws2_32 winmm)
 
 	# Backup sound and music routines if the selected backend does not provide any routines
-	set(BACKUP_SOUND sound/win32_sound_xa.cc)
-	set(BACKUP_MUSIC music/w32_midi.cc)
+	set(BACKUP_SOUND src/simutrans/sound/win32_sound_xa.cc)
+	set(BACKUP_MUSIC src/simutrans/music/w32_midi.cc)
 else ()
 	if (SIMUTRANS_BACKEND STREQUAL "sdl2")
-		target_sources(simutrans PRIVATE sys/clipboard_s2.cc)
+		target_sources(simutrans PRIVATE src/simutrans/sys/clipboard_s2.cc)
 	else ()
-		target_sources(simutrans PRIVATE sys/clipboard_internal.cc)
+		target_sources(simutrans PRIVATE src/simutrans/sys/clipboard_internal.cc)
 	endif ()
 	if (APPLE)
-		target_sources(simutrans PRIVATE OSX/translocation.m)
+		target_sources(simutrans PRIVATE src/OSX/translocation.m)
 		#Darwin kernel version is used to identify macOS version (16->10.12/Sierra)
 		if (CMAKE_HOST_SYSTEM_VERSION VERSION_GREATER_EQUAL 16) #AVF
-			set(BACKUP_SOUND sound/AVF_core-audio_sound.mm)
+			set(BACKUP_SOUND src/simutrans/sound/AVF_core-audio_sound.mm)
 			#AVF MIDI currently crash Simutrans
-			#set(BACKUP_MUSIC music/AVF_core-audio_midi.mm)
-			set(BACKUP_MUSIC music/no_midi.cc)
+			#set(BACKUP_MUSIC src/simutrans/music/AVF_core-audio_midi.mm)
+			set(BACKUP_MUSIC src/simutrans/music/no_midi.cc)
 		else () #QTKit
-			set(BACKUP_SOUND sound/core-audio_sound.mm)
-			set(BACKUP_MUSIC music/core-audio_midi.mm)
+			set(BACKUP_SOUND src/simutrans/sound/core-audio_sound.mm)
+			set(BACKUP_MUSIC src/simutrans/music/core-audio_midi.mm)
 		endif ()
 	else ()
-		set(BACKUP_SOUND sound/no_sound.cc)
-		set(BACKUP_MUSIC music/no_midi.cc)
+		set(BACKUP_SOUND src/simutrans/sound/no_sound.cc)
+		set(BACKUP_MUSIC src/simutrans/music/no_midi.cc)
 	endif ()
 endif ()
 
@@ -154,7 +157,7 @@ if (SIMUTRANS_MULTI_THREAD)
 endif (SIMUTRANS_MULTI_THREAD)
 
 if (SIMUTRANS_BACKEND STREQUAL "sdl2")
-	target_sources(simutrans PRIVATE display/simgraph16.cc sys/simsys_s2.cc sound/sdl2_sound.cc)
+	target_sources(simutrans PRIVATE src/simutrans/display/simgraph16.cc src/simutrans/sys/simsys_s2.cc src/simutrans/sound/sdl2_sound.cc)
 	target_include_directories(simutrans PRIVATE ${SDL2_INCLUDE_DIRS})
 	if (MINGW)
 		target_link_libraries(simutrans PRIVATE ${SDL2_STATIC_LIBRARIES})
@@ -168,7 +171,7 @@ if (SIMUTRANS_BACKEND STREQUAL "sdl2")
 	target_compile_definitions(simutrans PRIVATE COLOUR_DEPTH=16)
 
 elseif (SIMUTRANS_BACKEND STREQUAL "gdi")
-	target_sources(simutrans PRIVATE display/simgraph16.cc sys/simsys_w.cc ${BACKUP_SOUND} )
+	target_sources(simutrans PRIVATE src/simutrans/display/simgraph16.cc src/simutrans/sys/simsys_w.cc ${BACKUP_SOUND} )
 	target_link_libraries(simutrans PRIVATE imm32 xaudio2_8)
 	target_compile_definitions(simutrans PRIVATE COLOUR_DEPTH=16)
 
@@ -177,7 +180,7 @@ else ()
 		message(WARNING "Unknown backend '${SIMUTRANS_BACKEND}', falling back to headless compilation")
 	endif ()
 
-	target_sources(simutrans PRIVATE display/simgraph0.cc sys/simsys_posix.cc sound/no_sound.cc music/no_midi.cc)
+	target_sources(simutrans PRIVATE src/simutrans/display/simgraph0.cc src/simutrans/sys/simsys_posix.cc src/simutrans/sound/no_sound.cc src/simutrans/music/no_midi.cc)
 	target_compile_definitions(simutrans PRIVATE COLOUR_DEPTH=0)
 endif ()
 
@@ -208,7 +211,7 @@ if (SIMUTRANS_USE_UPNP)
 endif (SIMUTRANS_USE_UPNP)
 
 if (SIMUTRANS_USE_ZSTD)
-	target_sources(simutrans PRIVATE io/rdwr/zstd_file_rdwr_stream.cc)
+	target_sources(simutrans PRIVATE src/simutrans/io/rdwr/zstd_file_rdwr_stream.cc)
 	target_include_directories(simutrans PRIVATE ${ZSTD_INCLUDE_DIRS})
 	target_compile_definitions(simutrans PRIVATE USE_ZSTD=1)
 	if (MSVC)
@@ -224,13 +227,11 @@ endif (SIMUTRANS_USE_ZSTD)
 # only consider FluidSynth for SDL2 and GDI backends
 if ((SIMUTRANS_BACKEND STREQUAL "sdl2") OR (SIMUTRANS_BACKEND STREQUAL "gdi"))
 	if (SIMUTRANS_USE_FLUIDSYNTH_MIDI)
-		target_sources(simutrans PRIVATE music/fluidsynth.cc gui/loadsoundfont_frame.cc)
+		target_sources(simutrans PRIVATE src/simutrans/music/fluidsynth.cc src/simutrans/gui/loadsoundfont_frame.cc)
 		target_compile_definitions(simutrans PRIVATE USE_FLUIDSYNTH_MIDI=1)
 		if (MINGW)
-			# not working because fluidsynth doesn't set static libraries for pkgconf
-			#target_link_libraries(simutrans PRIVATE ${FluidSynth_STATIC_LIBRARIES})
-			# manually linking them instead, until it is fixed
-			target_link_libraries(simutrans PRIVATE -lfluidsynth -lharfbuzz -lgraphite2 -lglib-2.0 -lintl -liconv -ldsound -lole32 -lws2_32 -lgomp -lksuser)
+			# since fluidsynth 2.2.2 fluidsynth.pc include static libraries, but some are still missing
+			target_link_libraries(simutrans PRIVATE ${FluidSynth_STATIC_LIBRARIES} -liconv -lgomp)
 		elseif (MSVC)
 			target_link_libraries(simutrans PRIVATE ${FluidSynth_LIBRARIES})
 		else ()
@@ -329,25 +330,27 @@ install(DIRECTORY "${CMAKE_SOURCE_DIR}/simutrans" DESTINATION "${CMAKE_BINARY_DI
 # download language files
 if (MSVC)
 	# MSVC has no variable on the install target path at execution time, which is why we expand the directories at creation time!
-	install(CODE "execute_process(COMMAND powershell -ExecutionPolicy Bypass -File ${CMAKE_SOURCE_DIR}/get_lang_files.ps1 WORKING_DIRECTORY ${simutrans_BINARY_DIR})")
-	if (NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
-		install(CODE "execute_process(COMMAND powershell -Command \"Remove-Item \'${simutrans_BINARY_DIR}/simutrans/simutrans.pdb\')")
-	endif ()
+	install(CODE "execute_process(COMMAND powershell -ExecutionPolicy Bypass -File ${CMAKE_SOURCE_DIR}/tools/get_lang_files.ps1 WORKING_DIRECTORY ${simutrans_BINARY_DIR})")
 else ()
-	install(CODE "execute_process(COMMAND sh ../get_lang_files.sh WORKING_DIRECTORY \${CMAKE_BINARY_DIR})")
+	install(CODE "execute_process(COMMAND sh ${CMAKE_SOURCE_DIR}/tools/get_lang_files.sh WORKING_DIRECTORY \${CMAKE_BINARY_DIR})")
 endif ()
 
 # pak installer
 if (NOT WIN32)
-	install(FILES get_pak.sh DESTINATION "${CMAKE_BINARY_DIR}/simutrans/"
+	install(FILES ${CMAKE_SOURCE_DIR}/tools/get_pak.sh DESTINATION "${CMAKE_BINARY_DIR}/simutrans/"
 		PERMISSIONS
 			OWNER_READ OWNER_WRITE OWNER_EXECUTE
 			GROUP_READ GROUP_EXECUTE
 			WORLD_READ WORLD_EXECUTE
 	)
 else ()
-	# NSIS missing
-	install(CODE "execute_process(COMMAND NSIS WORKING_DIRECTORY \${CMAKE_SOURCE_DIR}/nsis)")
+	# NSIS must be installed manually in the path with the right addons
+	if(MINGW)
+		install(CODE "execute_process(COMMAND makensis onlineupgrade.nsi WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/src/Windows/nsis)")
+	else ()
+		install(CODE "execute_process(COMMAND cmd /k \"$ENV{ProgramFiles\(x86\)}/NSIS/makensis.exe\" onlineupgrade.nsi WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/src/Windows/nsis)")
+	endif ()
+	install(FILES "${CMAKE_SOURCE_DIR}/src/Windows/nsis/download-paksets.exe" DESTINATION "${CMAKE_BINARY_DIR}/simutrans")
 endif ()
 
 # install pak if needed
@@ -356,29 +359,56 @@ if (SIMUTRANS_INSTALL_PAK64)
 		install(CODE
 		"if(NOT EXISTS ${simutrans_BINARY_DIR}/simutrans/pak)
 		execute_process(COMMAND powershell -Command \"Remove-Item \'${simutrans_BINARY_DIR}/simutrans/pak\' -Recurse\" WORKING_DIRECTORY ${simutrans_BINARY_DIR})
-		file(STRINGS ${CMAKE_SOURCE_DIR}/paksetinfo.h URLpak64 REGEX \"/pak64/\")
+		file(STRINGS ${CMAKE_SOURCE_DIR}/src/simutrans/paksetinfo.h URLpak64 REGEX \"/pak64/\")
 		string( REGEX REPLACE \"^.[\\t ]*\\\"\" \"\" URLpak64 \${URLpak64})
 		string( REGEX REPLACE \"\\\", .*\$\" \"\" URLpak64 \${URLpak64})
 		message(\"install pak to \" ${simutrans_BINARY_DIR})
-		execute_process(COMMAND powershell -ExecutionPolicy Bypass -File ${CMAKE_SOURCE_DIR}/get_pak.ps1 \${URLpak64} WORKING_DIRECTORY ${simutrans_BINARY_DIR}/simutrans)
+		execute_process(COMMAND powershell -ExecutionPolicy Bypass -File ${CMAKE_SOURCE_DIR}/tools/get_pak.ps1 \${URLpak64} WORKING_DIRECTORY ${simutrans_BINARY_DIR}/simutrans)
 		endif ()
 		")
 	else ()
 		# install pak64 with the bundle
 		install(CODE
-		"file(STRINGS  ${CMAKE_SOURCE_DIR}/paksetinfo.h URLpak64 REGEX \"/pak64/\")
+		"file(STRINGS  ${CMAKE_SOURCE_DIR}/src/simutrans/paksetinfo.h URLpak64 REGEX \"/pak64/\")
 		 string( REGEX REPLACE \"^.[\\t ]*\\\"\" \"\" URLpak64 \${URLpak64})
 		 string( REGEX REPLACE \"\\\", .*\$\" \"\" URLpak64 \${URLpak64})
-		 execute_process(COMMAND sh ../../get_pak.sh \${URLpak64} WORKING_DIRECTORY \${CMAKE_BINARY_DIR}/simutrans)
+		 execute_process(COMMAND sh ../../${CMAKE_SOURCE_DIR}/tools/get_pak.sh \${URLpak64} WORKING_DIRECTORY \${CMAKE_BINARY_DIR}/simutrans)
 		")
 	endif ()
-endif()
+endif ()
 
+# bundle libraries on linux if requested
+if(OPTION_BUNDLE_LIBRARIES AND UNIX AND NOT APPLE)
+	# Steam Runtime already includes some of our libraries
+	if (SIMUTRANS_STEAM_BUILT)
+		install(CODE [[
+			file(GET_RUNTIME_DEPENDENCIES
+					RESOLVED_DEPENDENCIES_VAR DEPENDENCIES
+					EXECUTABLES "${CMAKE_BINARY_DIR}/simutrans/simutrans"
+					PRE_EXCLUDE_REGEXES "libSDL2*|libz.so*|libfreetype*|libpng*|libglib*|libogg*|libpcre*|libvorbis*"
+					POST_EXCLUDE_REGEXES "ld-linux|libc.so|libdl.so|libm.so|libgcc_s.so|libpthread.so|libstdc...so|libgomp.so")
+		]])
+	else ()
+		install(CODE [[
+			file(GET_RUNTIME_DEPENDENCIES
+					RESOLVED_DEPENDENCIES_VAR DEPENDENCIES
+					EXECUTABLES "${CMAKE_BINARY_DIR}/simutrans/simutrans"
+					PRE_EXCLUDE_REGEXES "libSDL2*|libz.so*"
+					POST_EXCLUDE_REGEXES "ld-linux|libc.so|libdl.so|libm.so|libgcc_s.so|libpthread.so|libstdc...so|libgomp.so")
+		]])
+	endif ()
+	install(CODE [[
+		file(INSTALL
+				DESTINATION "${CMAKE_BINARY_DIR}/simutrans/lib"
+				FILES ${DEPENDENCIES}
+				FOLLOW_SYMLINK_CHAIN)
+	]])
+endif ()
 
 #
 # Nettool/Makeobj
 #
-add_subdirectory(makeobj EXCLUDE_FROM_ALL)
-add_subdirectory(nettools EXCLUDE_FROM_ALL)
+add_subdirectory(src/makeobj EXCLUDE_FROM_ALL)
+add_subdirectory(src/nettool EXCLUDE_FROM_ALL)
 
 
