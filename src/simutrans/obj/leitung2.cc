@@ -8,8 +8,6 @@
 #include "../utils/simthread.h"
 static pthread_mutex_t verbinde_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t calc_image_mutex = PTHREAD_MUTEX_INITIALIZER;
-static pthread_mutex_t pumpe_list_mutex = PTHREAD_MUTEX_INITIALIZER;
-static pthread_mutex_t senke_list_mutex = PTHREAD_MUTEX_INITIALIZER;
 #endif
 
 #include "leitung2.h"
@@ -29,6 +27,7 @@ static pthread_mutex_t senke_list_mutex = PTHREAD_MUTEX_INITIALIZER;
 #include "../dataobj/loadsave.h"
 #include "../dataobj/powernet.h"
 #include "../dataobj/environment.h"
+#include "../dataobj/pakset_manager.h"
 
 #include "../ground/grund.h"
 #include "../builder/wegbauer.h"
@@ -393,7 +392,7 @@ void leitung_t::rdwr(loadsave_t *file)
 				if(desc==NULL) {
 					desc = way_builder_t::get_desc(translator::compatibility_name(bname));
 					if(desc==NULL) {
-						welt->add_missing_paks( bname, karte_t::MISSING_WAY );
+						pakset_manager_t::add_missing_paks( bname, MISSING_WAY );
 						desc = way_builder_t::leitung_desc;
 
 						if (!desc) {
@@ -437,21 +436,7 @@ sint64 leitung_t::get_maintenance() const
 
 /************************************ from here on pump (source) stuff ********************************************/
 
-slist_tpl<pumpe_t *> pumpe_t::pumpe_list;
-
-
-void pumpe_t::new_world()
-{
-	pumpe_list.clear();
-}
-
-
-void pumpe_t::step_all(uint32 delta_t)
-{
-	for(pumpe_t* const p : pumpe_list) {
-		p->step(delta_t);
-	}
-}
+freelist_iter_tpl<pumpe_t> pumpe_t::pl;
 
 
 pumpe_t::pumpe_t(loadsave_t *file ) : leitung_t( koord3d::invalid, NULL )
@@ -481,19 +466,16 @@ pumpe_t::~pumpe_t()
 	if(  net != NULL  ) {
 		net->sub_supply(power_supply);
 	}
-	pumpe_list.remove( this );
 }
 
-void pumpe_t::step(uint32 delta_t)
+sync_result pumpe_t::sync_step(uint32 delta_t)
 {
 	if(  fab == NULL  ) {
-		return;
+		return SYNC_DELETE;
 	}
 	else if(  delta_t == 0  ) {
-		return;
+		return SYNC_OK;
 	}
-
-	// usage logic could go here
 
 	// resolve image
 	uint16 winter_offset = 0;
@@ -508,6 +490,7 @@ void pumpe_t::step(uint32 delta_t)
 		set_flag(obj_t::dirty);
 		set_image(new_image);
 	}
+	return SYNC_OK;
 }
 
 void pumpe_t::set_net(powernet_t * p)
@@ -577,16 +560,11 @@ void pumpe_t::finish_rd()
 	}
 
 #ifdef MULTI_THREAD
-	pthread_mutex_lock( &pumpe_list_mutex );
-	pumpe_list.insert( this );
-	pthread_mutex_unlock( &pumpe_list_mutex );
-
 	pthread_mutex_lock( &calc_image_mutex );
 	set_image(skinverwaltung_t::pumpe->get_image_id(0));
 	is_crossing = false;
 	pthread_mutex_unlock( &calc_image_mutex );
 #else
-	pumpe_list.insert( this );
 	set_image(skinverwaltung_t::pumpe->get_image_id(0));
 	is_crossing = false;
 #endif
@@ -608,13 +586,14 @@ void pumpe_t::info(cbuffer_t & buf) const
 
 /************************************ Distriubtion Transformer Code ********************************************/
 
-slist_tpl<senke_t *> senke_t::senke_list;
+freelist_iter_tpl<senke_t> senke_t::sl;
 uint32 senke_t::payment_timer = 0;
+bool senke_t::payout = false;
 
 void senke_t::new_world()
 {
-	senke_list.clear();
 	payment_timer = 0;
+	payout = false;
 }
 
 void senke_t::static_rdwr(loadsave_t *file)
@@ -624,62 +603,50 @@ void senke_t::static_rdwr(loadsave_t *file)
 	}
 }
 
-void senke_t::step_all(uint32 delta_t)
+void senke_t::sync_handler(uint32 delta_t)
 {
 	// payment period (could be tied to game setting)
 	const uint32 pay_period = PRODUCTION_DELTA_T * 10; // 10 seconds
 
 	// revenue payout timer
 	payment_timer += delta_t;
-	const bool payout = payment_timer >= pay_period;
+	payout = payment_timer >= pay_period;
 	payment_timer %= pay_period;
 
-	// step all distribution transformers
-	for(senke_t* const s : senke_list) {
-		s->step(delta_t);
-		if (payout) {
-			s->pay_revenue();
-		}
-	}
+	sl.sync_step(delta_t);
 }
 
 
 senke_t::senke_t(loadsave_t *file) : leitung_t( koord3d::invalid, NULL )
 {
 	fab = NULL;
-	delta_sum = 0;
+	delta_t_sum = 0;
 	next_t = 0;
 	power_demand = 0;
 	energy_acc = 0;
 	is_transformer = true;
 
 	rdwr( file );
-
-	welt->sync.add(this);
 }
 
 
 senke_t::senke_t(koord3d pos, player_t *player) : leitung_t(pos, player)
 {
 	fab = NULL;
-	delta_sum = 0;
+	delta_t_sum = 0;
 	next_t = 0;
 	power_demand = 0;
 	energy_acc = 0;
 	is_transformer = true;
 
 	player_t::book_construction_costs(player, welt->get_settings().cst_transformer, get_pos().get_2d(), powerline_wt);
-
-	welt->sync.add(this);
 }
-
 
 senke_t::~senke_t()
 {
 	// one last final income
 	pay_revenue();
 
-	welt->sync.remove( this );
 	if(fab!=NULL) {
 		fab->remove_transformer_connected(this);
 		fab = NULL;
@@ -687,21 +654,8 @@ senke_t::~senke_t()
 	if(  net != NULL  ) {
 		net->sub_demand(power_demand);
 	}
-	senke_list.remove( this );
 }
 
-void senke_t::step(uint32 delta_t)
-{
-	if(  fab == NULL  ) {
-		return;
-	}
-	else if(  delta_t == 0  ) {
-		return;
-	}
-
-	// energy metering logic
-	energy_acc += ((uint64)power_demand * (uint64)get_net()->get_normal_supply() * (uint64)delta_t) / ((uint64)PRODUCTION_DELTA_T << powernet_t::FRACTION_PRECISION);
-}
 
 void senke_t::pay_revenue()
 {
@@ -760,13 +714,13 @@ sync_result senke_t::sync_step(uint32 delta_t)
 	}
 
 	// advance timers
-	delta_sum += delta_t;
+	delta_t_sum += delta_t;
 	next_t += delta_t;
 
 	// change graphics at most 16 times a second
 	if(  next_t > PRODUCTION_DELTA_T / 16  ) {
 		// enforce timer periods
-		delta_sum %= PRODUCTION_DELTA_T; // 1 second
+		delta_t_sum %= PRODUCTION_DELTA_T; // 1 second
 		next_t %= PRODUCTION_DELTA_T / 16; // 1/16 seconds
 
 		// determine pwm period for image change
@@ -790,7 +744,7 @@ sync_result senke_t::sync_step(uint32 delta_t)
 		}
 
 		// determine image with PWM logic
-		const uint16 work_offset = (delta_sum < pwm_period) ? 1 : 0;
+		const uint16 work_offset = (delta_t_sum < pwm_period) ? 1 : 0;
 
 		// apply seasonal image offset
 		uint16 winter_offset = 0;
@@ -806,6 +760,14 @@ sync_result senke_t::sync_step(uint32 delta_t)
 			set_image( new_image );
 		}
 	}
+
+	// energy metering logic
+	energy_acc += ((uint64)power_demand * (uint64)get_net()->get_normal_supply() * (uint64)delta_t) / ((uint64)PRODUCTION_DELTA_T << powernet_t::FRACTION_PRECISION);
+
+	if (payout) {
+		pay_revenue();
+	}
+
 	return SYNC_OK;
 }
 
@@ -827,11 +789,11 @@ void senke_t::rdwr(loadsave_t *file)
 	}
 
 	if (file->is_version_atleast(122, 1)) {
-		file->rdwr_long(delta_sum);
+		file->rdwr_long(delta_t_sum);
 		file->rdwr_long(next_t);
 	}
 	else if (file->is_loading()) {
-		delta_sum = 0;
+		delta_t_sum = 0;
 		next_t = 0;
 	}
 }
@@ -857,11 +819,6 @@ void senke_t::finish_rd()
 	}
 
 #ifdef MULTI_THREAD
-	pthread_mutex_lock( &senke_list_mutex );
-#endif
-	senke_list.insert( this );
-#ifdef MULTI_THREAD
-	pthread_mutex_unlock( &senke_list_mutex );
 	pthread_mutex_lock( &calc_image_mutex );
 #endif
 	set_image(skinverwaltung_t::senke->get_image_id(0));

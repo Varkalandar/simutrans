@@ -11,8 +11,8 @@ LIBS :=
 SOURCES :=
 STATIC := 0
 
-DYNAMICSTART = 
-DYNAMICEND = 
+DYNAMICSTART =
+DYNAMICEND =
 
 CFG ?= default
 -include config.$(CFG)
@@ -110,7 +110,6 @@ else ifeq ($(OSTYPE),linux)
     DYNAMICEND = -Wl,-Bstatic 
   endif
 else ifeq ($(OSTYPE),mac)
-  SOURCES += src/simutrans/OSX/translocation.m
   LDFLAGS += -framework Cocoa
 endif
 
@@ -272,9 +271,8 @@ else
   endif
 endif
 
-GIT_HASH := $(shell git rev-parse --short=7 HEAD 2>/dev/null 1>/dev/null; echo $$?)
-ifneq ($(GIT_HASH),)
-  GIT_HASH := $(shell git rev-parse --short=7 HEAD)
+GIT_HASH := $(shell git rev-parse --short=7 HEAD)
+ifeq ($(.SHELLSTATUS),0)
   $(info Git hash is 0x$(GIT_HASH))
   CFLAGS  += -DGIT_HASH=0x$(GIT_HASH)
 endif
@@ -303,6 +301,8 @@ SOURCES += src/simutrans/dataobj/koord3d.cc
 SOURCES += src/simutrans/dataobj/loadsave.cc
 SOURCES += src/simutrans/dataobj/marker.cc
 SOURCES += src/simutrans/dataobj/objlist.cc
+SOURCES += src/simutrans/dataobj/pakset_manager.cc
+SOURCES += src/simutrans/dataobj/pakset_downloader.cc
 SOURCES += src/simutrans/dataobj/powernet.cc
 SOURCES += src/simutrans/dataobj/records.cc
 SOURCES += src/simutrans/dataobj/rect.cc
@@ -463,6 +463,7 @@ SOURCES += src/simutrans/gui/script_tool_frame.cc
 SOURCES += src/simutrans/gui/server_frame.cc
 SOURCES += src/simutrans/gui/settings_frame.cc
 SOURCES += src/simutrans/gui/settings_stats.cc
+SOURCES += src/simutrans/gui/signal_info.cc
 SOURCES += src/simutrans/gui/signal_spacing.cc
 SOURCES += src/simutrans/gui/simwin.cc
 SOURCES += src/simutrans/gui/sound_frame.cc
@@ -605,6 +606,7 @@ SOURCES += src/simutrans/world/placefinder.cc
 SOURCES += src/simutrans/world/simcity.cc
 SOURCES += src/simutrans/world/simplan.cc
 SOURCES += src/simutrans/world/simworld.cc
+SOURCES += src/simutrans/world/surface.cc
 SOURCES += src/simutrans/world/terraformer.cc
 SOURCES += src/squirrel/sq_extensions.cc
 SOURCES += src/squirrel/sqstdlib/sqstdaux.cc
@@ -768,7 +770,7 @@ nettool:
 	$(Q)$(MAKE) -e -C src/nettool FLAGS="$(FLAGS)"
 
 test: simutrans
-	$(PROGDIR)/$(PROG) -set_workdir $(shell pwd)/simutrans -objects pak -scenario automated-tests -debug 2 -lang en -fps 100
+	$(PROGDIR)/$(PROG) -set_basedir $(shell pwd)/simutrans -objects pak -scenario automated-tests -debug 2 -lang en -fps 100
 
 clean:
 	@echo "===> Cleaning up"

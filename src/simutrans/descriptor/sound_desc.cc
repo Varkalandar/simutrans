@@ -46,7 +46,7 @@ sint16 sound_desc_t::compatible_sound_id[MAX_OLD_SOUNDS]=
 	NO_SOUND, NO_SOUND, NO_SOUND, NO_SOUND
 };
 
-// sound with the names of climates and "beach" and "forest" are reserved for ambient noises
+// sound with the names of climates and "beaches" and "forest" are reserved for ambient noises
 sint16 sound_desc_t::beach_sound = NO_SOUND;
 sint16 sound_desc_t::forest_sound = NO_SOUND;
 sint16 sound_desc_t::climate_sounds[MAX_CLIMATES]=
@@ -62,8 +62,8 @@ void sound_desc_t::init()
 {
 	// ok, now init
 	sound_on = true;
-	sound_path = env_t::data_dir;
-	sound_path= sound_path + env_t::objfilename + "sound/";
+	sound_path = env_t::base_dir;
+	sound_path= sound_path + env_t::pak_name + "sound/";
 	// process sound.tab
 	tabfile_t soundconf;
 	if (soundconf.open((sound_path + "sound.tab").c_str())) {

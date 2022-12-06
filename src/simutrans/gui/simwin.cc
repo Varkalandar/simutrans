@@ -19,6 +19,7 @@
 #include "../simintr.h"
 #include "../simhalt.h"
 #include "../world/simworld.h"
+#include "../utils/simrandom.h"
 
 #include "../dataobj/translator.h"
 #include "../dataobj/environment.h"
@@ -186,7 +187,7 @@ static int display_gadget_box(sint8 code,
 	if(  img != NULL  ) {
 
 		// Max Kielland: This center the gadget image and compensates for any left/top margins within the image to be backward compatible with older PAK sets.
-		display_img_aligned(img->imageid, scr_rect(x, y, D_GADGET_WIDTH, D_TITLEBAR_HEIGHT), ALIGN_CENTER_H | ALIGN_CENTER_V, true);
+		display_img_aligned(img->imageid, scr_rect(x, y, D_GADGET_WIDTH, D_TITLEBAR_HEIGHT), ALIGN_CENTER_H | ALIGN_CENTER_V, false);
 
 	}
 	else {
@@ -205,7 +206,7 @@ static int display_gadget_box(sint8 code,
 		else if(  code == SKIN_GADGET_PINNED  ) {
 			gadget_text = "S";
 		}
-		display_proportional_rgb( x+4, y+4, gadget_text, ALIGN_LEFT, color_idx_to_rgb(COL_BLACK), false );
+		display_proportional_rgb( x+4, y+4, gadget_text, ALIGN_LEFT, SYSCOL_TEXT, false );
 	}
 
 	int side = x+REVERSE_GADGETS*D_GADGET_WIDTH-1;
@@ -329,7 +330,7 @@ static void win_draw_window_title(const scr_coord pos, const scr_size size,
 	PIXVAL darker  = display_blend_colors(title_color, color_idx_to_rgb(COL_BLACK), 25);
 
 	// fill title bar with color
-	display_fillbox_wh_clip_rgb(pos.x, pos.y, size.w, D_TITLEBAR_HEIGHT, title_color, false);
+	display_fillbox_wh_clip_rgb(pos.x, pos.y, size.w, D_TITLEBAR_HEIGHT, title_color, true);
 
 	// border of title bar
 	display_fillbox_wh_clip_rgb( pos.x + 1, pos.y,                         size.w - 2, 1, lighter, false ); // top
@@ -343,7 +344,7 @@ static void win_draw_window_title(const scr_coord pos, const scr_size size,
 	int width = display_gadget_boxes( &flags, pos.x+(REVERSE_GADGETS?0:size.w-D_GADGET_WIDTH), pos.y, lighter, darker, gadget_state, sticky, goto_pushed );
 	int titlewidth = display_proportional_clip_rgb( pos.x + (REVERSE_GADGETS?width+4:4), pos.y+(D_TITLEBAR_HEIGHT-LINEASCENT)/2, text, ALIGN_LEFT, text_color, false );
 	if(  flags.gotopos  ) {
-		display_proportional_clip_rgb( pos.x + (REVERSE_GADGETS?width+4:4)+titlewidth+8, pos.y+(D_TITLEBAR_HEIGHT-LINEASCENT)/2, welt_pos.get_2d().get_fullstr(), ALIGN_LEFT, text_color, false );
+		display_proportional_clip_rgb( pos.x + (REVERSE_GADGETS?width+4:4)+titlewidth+8, pos.y+(D_TITLEBAR_HEIGHT-LINEASCENT)/2, welt_pos.get_fullstr(), ALIGN_LEFT, text_color, false );
 	}
 	POP_CLIP();
 }
@@ -592,9 +593,7 @@ void rdwr_all_win(loadsave_t *file)
 					case magic_none: return;
 
 					// actual dialogues to restore
-					case magic_convoi_info:    w = new convoi_info_t(); break;
 					case magic_themes:         w = new themeselector_t(); break;
-					case magic_halt_info:      w = new halt_info_t(); break;
 					case magic_reliefmap:      w = new map_frame_t(); break;
 					case magic_ki_kontroll_t:  w = new ki_kontroll_t(); break;
 					case magic_line_schedule_rdwr_dummy: w = new line_management_gui_t(); break;
@@ -630,6 +629,12 @@ void rdwr_all_win(loadsave_t *file)
 						else if(  id>=magic_toolbar  &&  id<magic_toolbar+256  ) {
 							tool_t::toolbar_tool[id-magic_toolbar]->update(wl->get_active_player());
 							w = tool_t::toolbar_tool[id-magic_toolbar]->get_tool_selector();
+						}
+						else if( id>=magic_convoi_info && id<magic_convoi_info+0x10000  ) {
+							w = new convoi_info_t();
+						}
+						else if( id>=magic_halt_info  &&  id<magic_halt_info+0x10000  ) {
+							w = new halt_info_t();
 						}
 						else {
 							dbg->error( "rdwr_all_win()", "No idea how to restore magic 0x%X", id );
@@ -854,12 +859,60 @@ int create_win(scr_coord_val x, scr_coord_val y, gui_frame_t* const gui, wintype
 }
 
 
+static int notify_top_win()
+{
+	// mark new dirty
+	scr_size size = wins.back().gui->get_windowsize();
+	mark_rect_dirty_wc( wins.back().pos.x - 1, wins.back().pos.y - 1, wins.back().pos.x + size.w + 2, wins.back().pos.y + size.h + 2 ); // -1, +2 for env_t::window_frame_active
+
+	event_t ev;
+
+	ev.ev_class = INFOWIN;
+	ev.ev_code = WIN_TOP;
+	ev.mx = 0;
+	ev.my = 0;
+	ev.cx = 0;
+	ev.cy = 0;
+	ev.button_state = 0;
+
+	void *old = inside_event_handling;
+	inside_event_handling = wins.back().gui;
+	wins.back().gui->infowin_event(&ev);
+	inside_event_handling = old;
+
+	return wins.get_count()-1;
+}
+
+
+int top_win(int win, bool keep_state )
+{
+	if(  (uint32)win==wins.get_count()-1  ) {
+		return win;
+	} // already topped
+
+	  // mark old dirty
+	scr_size size = wins.back().gui->get_windowsize();
+	mark_rect_dirty_wc( wins.back().pos.x - 1, wins.back().pos.y - 1, wins.back().pos.x + size.w + 2, wins.back().pos.y + size.h + 2 ); // -1, +2 for env_t::window_frame_active
+	wins.back().dirty = true;
+
+	simwin_t tmp = wins[win];
+	wins.remove_at(win);
+	if(  !keep_state  ) {
+		tmp.rollup = false; // make visible when topping
+	}
+	wins.append(tmp);
+
+	return notify_top_win();
+}
+
+
 /* sometimes a window cannot destroyed while it is still handled;
  * in those cases it will added to kill list and it is only destructed
  * by this function
  */
 static void process_kill_list()
 {
+	bool needs_top = !kill_list.empty();
 	for(simwin_t & i : kill_list) {
 		if (inside_event_handling != i.gui) {
 			destroy_framed_win(&i); // we call this first, otherwise the focus may not be recognized
@@ -867,6 +920,10 @@ static void process_kill_list()
 		}
 	}
 	kill_list.clear();
+	// top message always after destruction
+	if(  needs_top  &&  wins.get_count()>1  ) {
+		notify_top_win();
+	}
 }
 
 
@@ -925,6 +982,7 @@ static bool destroy_framed_win(simwin_t *wins)
 	if(  wl  ) {
 		wl->set_background_dirty();
 	}
+	tooltip_text = 0;
 	return r;
 }
 
@@ -941,12 +999,6 @@ bool destroy_win(const ptrdiff_t magic)
 
 bool destroy_win(const gui_frame_t *gui)
 {
-	if(wins.get_count() > 1  &&  wins.back().gui == gui) {
-		// destroy topped window, top the next window before removing
-		// do it here as top_win manipulates the win vector
-		top_win(wins.get_count() - 2, true);
-	}
-
 	for(  uint i=0;  i<wins.get_count();  i++  ) {
 		if(wins[i].gui == gui) {
 			if(inside_event_handling==wins[i].gui) {
@@ -965,6 +1017,9 @@ bool destroy_win(const gui_frame_t *gui)
 					}
 				}
 				destroy_framed_win(&win);
+				if(  wins.get_count()>1  ) {
+					notify_top_win();
+				}
 			}
 			return true;
 		}
@@ -1025,47 +1080,6 @@ void rolldown_all_win()
 		scr_size size = gui->get_windowsize();
 		mark_rect_dirty_wc( wins[curWin].pos.x, wins[curWin].pos.y, wins[curWin].pos.x+size.w, wins[curWin].pos.y+size.h );
 	}
-}
-
-
-int top_win(int win, bool keep_state )
-{
-	if(  (uint32)win==wins.get_count()-1  ) {
-		return win;
-	} // already topped
-
-	// mark old dirty
-	scr_size size = wins.back().gui->get_windowsize();
-	mark_rect_dirty_wc( wins.back().pos.x - 1, wins.back().pos.y - 1, wins.back().pos.x + size.w + 2, wins.back().pos.y + size.h + 2 ); // -1, +2 for env_t::window_frame_active
-	wins.back().dirty = true;
-
-	simwin_t tmp = wins[win];
-	wins.remove_at(win);
-	if(  !keep_state  ) {
-		tmp.rollup = false; // make visible when topping
-	}
-	wins.append(tmp);
-
-	 // mark new dirty
-	size = wins.back().gui->get_windowsize();
-	mark_rect_dirty_wc( wins.back().pos.x - 1, wins.back().pos.y - 1, wins.back().pos.x + size.w + 2, wins.back().pos.y + size.h + 2 ); // -1, +2 for env_t::window_frame_active
-
-	event_t ev;
-
-	ev.ev_class = INFOWIN;
-	ev.ev_code = WIN_TOP;
-	ev.mx = 0;
-	ev.my = 0;
-	ev.cx = 0;
-	ev.cy = 0;
-	ev.button_state = 0;
-
-	void *old = inside_event_handling;
-	inside_event_handling = tmp.gui;
-	tmp.gui->infowin_event(&ev);
-	inside_event_handling = old;
-
-	return wins.get_count()-1;
 }
 
 
@@ -1423,6 +1437,7 @@ bool check_pos_win(event_t *ev)
 {
 	static int is_resizing = -1;
 	static int is_moving = -1;
+	static bool is_dragging = false;
 
 	bool swallowed = false;
 
@@ -1467,9 +1482,9 @@ bool check_pos_win(event_t *ev)
 	scr_coord menuoffset((env_t::menupos == MENU_RIGHT) * (display_get_width() - env_t::iconsize.w), (env_t::menupos == MENU_BOTTOM) * (display_get_height() - env_t::iconsize.h) - D_TITLEBAR_HEIGHT);
 	if (!tool_t::toolbar_tool.empty()  &&
 		tool_t::toolbar_tool[0]->get_tool_selector()  &&
-		tool_t::toolbar_tool[0]->get_tool_selector()->is_hit(x-menuoffset.x, y-menuoffset.y)  &&
+		(is_dragging  ||  tool_t::toolbar_tool[0]->get_tool_selector()->is_hit(x-menuoffset.x, y-menuoffset.y))  &&
 		y > menuoffset.y+D_TITLEBAR_HEIGHT  &&
-		ev->ev_class != EVENT_KEYBOARD) {
+		ev->ev_class >= EVENT_CLICK  &&  ev->ev_class <= EVENT_DRAG  ) {
 
 		event_t wev = *ev;
 		wev.move_origin(menuoffset);
@@ -1477,6 +1492,8 @@ bool check_pos_win(event_t *ev)
 		inside_event_handling = tool_t::toolbar_tool[0];
 		tool_t::toolbar_tool[0]->get_tool_selector()->infowin_event( &wev );
 		inside_event_handling = NULL;
+
+		is_dragging = ev->ev_class != EVENT_RELEASE  &&  ev->button_state>1;
 
 		// swallow event
 		return true;
@@ -1495,13 +1512,13 @@ bool check_pos_win(event_t *ev)
 	}
 
 	// just move top window until button release
-	if(  is_moving>=0  &&  (unsigned)is_moving<wins.get_count()  &&  (IS_LEFTDRAG(ev)  ||  IS_LEFTREPEAT(ev))  ) {
+	if(  is_moving>=0  &&  (unsigned)is_moving<wins.get_count()  &&  (IS_LEFTDRAG(ev)  )  ) {
 		move_win( is_moving, ev );
 		return true;
 	}
 
 	// just resize window until button release
-	if(  is_resizing>=0  &&  (unsigned)is_resizing<wins.get_count()  &&  (IS_LEFTDRAG(ev)  ||  IS_LEFTREPEAT(ev))  ) {
+	if(  is_resizing>=0  &&  (unsigned)is_resizing<wins.get_count()  &&  (IS_LEFTDRAG(ev)  )  ) {
 		resize_win( is_resizing, ev );
 		return true;
 	}
@@ -1515,11 +1532,7 @@ bool check_pos_win(event_t *ev)
 	// swallow all other events in ticker (if there)
 	if(  !(ev->ev_class == EVENT_KEYBOARD  ||  ev->ev_class == EVENT_STRING)  &&  show_ticker  &&  y > display_get_height()- win_get_statusbar_height() - TICKER_HEIGHT  ) {
 		if(  IS_LEFTCLICK(ev)  ) {
-			// goto infowin koordinate, if ticker is active
-			koord p = ticker::get_welt_pos();
-			if(wl->is_within_limits(p)) {
-				wl->get_viewport()->change_world_position(koord3d(p,wl->min_hgt(p)));
-			}
+			ticker::process_click(x);
 		}
 		// swallow event
 		return true;
@@ -1634,7 +1647,7 @@ bool check_pos_win(event_t *ev)
 												(ev->cx > wins[i].pos.x + size.w - D_DRAGGER_WIDTH  &&
 												 ev->cy > wins[i].pos.y + size.h - D_DRAGGER_HEIGHT);
 
-					if((IS_LEFTCLICK(ev)  ||  IS_LEFTDRAG(ev)  ||  IS_LEFTREPEAT(ev))  &&  canresize  &&  wins[i].gui->get_resizemode()!=gui_frame_t::no_resize) {
+					if((IS_LEFTCLICK(ev)  ||  IS_LEFTDRAG(ev))  &&  canresize  &&  wins[i].gui->get_resizemode()!=gui_frame_t::no_resize) {
 						resize_win( i, ev );
 						is_resizing = i;
 					}
@@ -1682,7 +1695,7 @@ void win_poll_event(event_t* const ev)
 		ev->ev_class = IGNORE_EVENT;
 	}
 	// save and reload all windows (currently only used when a new theme is applied)
-	if(  ev->ev_class==EVENT_SYSTEM  &&  ev->ev_code==SYSTEM_RELOAD_WINDOWS  ) {
+	else if(  ev->ev_class==EVENT_SYSTEM  &&  ev->ev_code==SYSTEM_RELOAD_WINDOWS  ) {
 		dr_chdir( env_t::user_dir );
 		loadsave_t dlg;
 
@@ -1700,7 +1713,7 @@ void win_poll_event(event_t* const ev)
 		ev->ev_class = IGNORE_EVENT;
 		ticker::redraw();
 	}
-	if(  ev->ev_class==EVENT_SYSTEM  &&  ev->ev_code==SYSTEM_THEME_CHANGED  ) {
+	else if(  ev->ev_class==EVENT_SYSTEM  &&  ev->ev_code==SYSTEM_THEME_CHANGED  ) {
 		// called when font is changed
 		ev->mx = ev->my = ev->cx = ev->cy = 0;
 		for(simwin_t const& i : wins) {
@@ -1982,6 +1995,10 @@ bool win_change_zoom_factor(bool magnify)
 {
 	const bool result = magnify ? zoom_factor_up() : zoom_factor_down();
 
+	if(magnify  &&  wl->is_step_mode_normal()) {
+		wl->reset_timer();
+	}
+
 	wl->get_viewport()->metrics_updated();
 
 	return result;
@@ -2099,7 +2116,7 @@ void modal_dialogue(gui_frame_t* gui, ptrdiff_t magic, karte_t* welt, bool (*qui
 		welt->set_pause(false);
 		welt->reset_interaction();
 		welt->reset_timer();
-
+		set_random_mode(MODAL_RANDOM);
 
 		const uint32 ms_per_frame = 1000 / env_t::fps;
 		const uint32 sync_steps_per_step = 5; // env_t::network_frames_per_step
@@ -2128,10 +2145,6 @@ void modal_dialogue(gui_frame_t* gui, ptrdiff_t magic, karte_t* welt, bool (*qui
 				DBG_DEBUG4("modal_dialogue", "calling check_pos_win");
 				check_pos_win(&ev);
 
-				if (ev.ev_class == EVENT_SYSTEM && ev.ev_code == SYSTEM_QUIT) {
-					env_t::quit_simutrans = true;
-					break;
-				}
 			} while(  ev.ev_class != EVENT_NONE  &&  dr_time()-frame_start_time < 50  );
 
 			const uint32 delta_t = (ms_per_frame * welt->get_time_multiplier()) / 16;
@@ -2154,7 +2167,7 @@ void modal_dialogue(gui_frame_t* gui, ptrdiff_t magic, karte_t* welt, bool (*qui
 				dr_sleep(next_frame_start_time - now);
 			}
 		}
-
+		clear_random_mode(MODAL_RANDOM);
 	}
 	else {
 		display_show_pointer(true);
@@ -2185,6 +2198,7 @@ void modal_dialogue(gui_frame_t* gui, ptrdiff_t magic, karte_t* welt, bool (*qui
 						dr_flush();
 					}
 					else if (ev.ev_code == SYSTEM_QUIT) {
+						// no world yet => simple quit
 						env_t::quit_simutrans = true;
 						break;
 					}

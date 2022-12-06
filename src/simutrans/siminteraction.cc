@@ -79,28 +79,19 @@ void interaction_t::move_cursor( const event_t &ev )
 		if (!tool->move_has_effects()) {
 			is_dragging = false;
 		}
-		else if(  !env_t::networkmode  ||  tool->is_move_network_safe(world->get_active_player())) {
-			tool->flags = event_get_last_control_shift() | tool_t::WFL_LOCAL;
+		else {
+			tool->flags = (event_get_last_control_shift() ^ tool_t::control_invert) | tool_t::WFL_LOCAL;
 			if(tool->check_pos( world->get_active_player(), zeiger->get_pos() )==NULL) {
 				if(  ev.button_state == 0  ) {
 					is_dragging = false;
 				}
 				else if(ev.ev_class==EVENT_DRAG) {
 					if(!is_dragging  &&  prev_pos != koord3d::invalid  &&  tool->check_pos( world->get_active_player(), prev_pos )==NULL) {
-						const char* err = world->get_scenario()->is_work_allowed_here(world->get_active_player(), tool->get_id(), tool->get_waytype(), prev_pos);
-						if (err == NULL) {
-							is_dragging = true;
-						}
-						else {
-							is_dragging = false;
-						}
+						is_dragging = true;
 					}
 				}
 				if (is_dragging) {
-					const char* err = world->get_scenario()->is_work_allowed_here(world->get_active_player(), tool->get_id(), tool->get_waytype(), pos);
-					if (err == NULL) {
-						tool->move( world->get_active_player(), is_dragging, pos );
-					}
+					world->set_deferred_move_to(pos, tool->flags);
 				}
 			}
 			tool->flags = 0;
@@ -220,7 +211,7 @@ void interaction_t::interactive_event( const event_t &ev )
 		}
 	}
 
-	if(  IS_LEFTRELEASE(&ev)  &&  ev.my < display_get_height() -16 -(TICKER_HEIGHT*ticker::empty())  ) {
+	if(  !is_dragging  &&  IS_LEFTRELEASE(&ev)  &&  ev.my < display_get_height() -16 -(TICKER_HEIGHT*ticker::empty())  ) {
 
 		DBG_MESSAGE("interaction_t::interactive_event(event_t &ev)", "calling a tool");
 
@@ -230,11 +221,11 @@ void interaction_t::interactive_event( const event_t &ev )
 			bool suspended = false; // true if execution was suspended, i.e. sent to server
 			tool_t *tool = world->get_tool(world->get_active_player_nr());
 			player_t *player = world->get_active_player();
-			tool->flags = event_get_last_control_shift();
+			tool->flags = event_get_last_control_shift() ^ tool_t::control_invert;
 			// first check for visibility etc (needs already right flags)
 			const char *err = tool->check_pos( player, pos );
 			if (err==NULL) {
-				err = world->call_work(tool, player, pos, suspended);
+				err = world->call_work_api(tool, player, pos, suspended, false);
 			}
 			if (!suspended) {
 				// play sound / error message
@@ -296,8 +287,15 @@ void interaction_t::interactive_event( const event_t &ev )
 bool interaction_t::process_event( event_t &ev )
 {
 	if(ev.ev_class==EVENT_SYSTEM  &&  ev.ev_code==SYSTEM_QUIT) {
-		// quit the program if this window is closed
-		world->stop(true);
+		// since we run in a sync_step, quitting may be needed to be delagated to a tool
+		if(  (LOAD_RANDOM | MAP_CREATE_RANDOM | MODAL_RANDOM) & get_random_mode()  ) {
+			// next sync step would take tool long
+			world->stop(true);
+		}
+		else {
+			// we call the proper tool for quitting
+			world->set_tool(tool_t::simple_tool[TOOL_QUIT], NULL);
+		}
 		return true;
 	}
 
@@ -315,9 +313,6 @@ bool interaction_t::process_event( event_t &ev )
 	DBG_DEBUG4("interaction_t::process_event", "after check_pos_win");
 
 	// Handle map drag with right-click
-
-	static bool left_drag = false;
-
 	if(IS_RIGHTCLICK(&ev)) {
 		display_show_pointer(false);
 	}
@@ -330,13 +325,13 @@ bool interaction_t::process_event( event_t &ev )
 		catch_dragging();
 		move_view(ev);
 	}
-	else if(  IS_LEFTDRAG(&ev)  &&  IS_LEFT_BUTTON_PRESSED(&ev)  &&  (left_drag  ||  !world->get_tool(world->get_active_player_nr())->move_has_effects())  ) {
+	else if(  IS_LEFTDRAG(&ev)  &&  IS_LEFT_BUTTON_PRESSED(&ev)  &&  (is_world_dragging  ||  (!world->get_tool(world->get_active_player_nr())->move_has_effects()  &&  !IS_CONTROL_PRESSED(&ev))  )  ) {
 		/* ok, we have a general tool selected, and we have a left drag or left release event with an actual difference
 		 * => move the map, if we are beyond a threshold */
-		if(  left_drag  ||  abs(ev.cx-ev.mx)+abs(ev.cy-ev.my)>=env_t::scroll_threshold  ) {
-			if (!left_drag) {
+		if(  is_world_dragging  ||  abs(ev.cx-ev.mx)+abs(ev.cy-ev.my)>=max(1,(env_t::scroll_threshold* get_tile_raster_width())/get_base_tile_raster_width())  ) {
+			if (!is_world_dragging) {
 				display_show_pointer(false);
-				left_drag = true;
+				is_world_dragging = true;
 			}
 			world->get_viewport()->set_follow_convoi(convoihandle_t());
 			catch_dragging();
@@ -345,11 +340,11 @@ bool interaction_t::process_event( event_t &ev )
 		}
 	}
 
-	if( !IS_LEFT_BUTTON_PRESSED(&ev)  &&  left_drag  ) {
+	if( !IS_LEFT_BUTTON_PRESSED(&ev)  &&  is_world_dragging  ) {
 		// show the mouse and swallow this event if we were dragging before
 		ev.ev_code = IGNORE_EVENT;
 		display_show_pointer(true);
-		left_drag = false;
+		is_world_dragging = false;
 	}
 
 
@@ -374,35 +369,49 @@ void interaction_t::check_events()
 {
 	event_t ev;
 
-	if(  env_t::networkmode  ) {
-		set_random_mode( INTERACTIVE_RANDOM );
-	}
-
 	win_poll_event(&ev);
 
-	while (  ev.ev_class != EVENT_NONE ) {
+	event_t deferred_ev;
+	deferred_ev.ev_class = EVENT_NONE;
+
+	while(  ev.ev_class != EVENT_NONE ) {
 
 		DBG_DEBUG4("interaction_t::check_events", "called win_poll_event");
 
-		if (process_event(ev)) {
-			// We have been asked to stop processing, exit.
-			return;
+		if (ev.ev_class == EVENT_DRAG) {
+			// defer processing, since there might be many triggered at once
+			// Otherwise mark tiles could be alled twice duing one step
+			deferred_ev = ev;
+		}
+		else {
+			// still one drag left in queue?
+			if (deferred_ev.ev_class == EVENT_DRAG) {
+				// do this first
+				process_event(deferred_ev);
+				deferred_ev.ev_class = EVENT_NONE;
+			}
+
+			if (process_event(ev)) {
+				// We have been asked to stop processing, exit.
+				return;
+			}
 		}
 
 		win_poll_event(&ev);
 	}
 
-	if(  env_t::networkmode  ) {
-		clear_random_mode( INTERACTIVE_RANDOM );
+	if (deferred_ev.ev_class == EVENT_DRAG) {
+		// process pending drag events
+		process_event(deferred_ev);
+		deferred_ev.ev_class = EVENT_NONE;
 	}
 }
 
 
-interaction_t::interaction_t()
+interaction_t::interaction_t(viewport_t *viewport) :
+	viewport(viewport),
+	is_dragging(false),
+	is_world_dragging(false)
 {
-	viewport = world->get_viewport();
-	is_dragging = false;
-
-	// Requires a world with a view already attached!
 	assert(viewport);
 }

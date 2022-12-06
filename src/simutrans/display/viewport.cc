@@ -99,17 +99,39 @@ void viewport_t::change_world_position( koord new_ij, sint16 new_xoff, sint16 ne
 }
 
 
+void viewport_t::switch_underground_mode(const koord3d& pos)
+{
+	if (grund_t *gr = world->lookup(pos)) {
+		if (!gr->is_visible()) {
+			if (gr->ist_tunnel()) {
+				// position is underground (and not visible), change to sliced mode
+				grund_t::set_underground_mode(grund_t::ugm_level, gr->get_hoehe());
+			}
+			else if (!gr->ist_karten_boden()  ||  grund_t::underground_mode != grund_t::ugm_all) {
+				// position is overground, change to normal view
+				// but not if we are in full underground view and gr is kartenboden
+				grund_t::set_underground_mode(grund_t::ugm_none, 0);
+			}
+			// make dirty etc
+			world->update_underground();
+		}
+	}
+}
+
+
 // change the center viewport position for a certain ground tile
 // any possible convoi to follow will be disabled
 void viewport_t::change_world_position( const koord3d& new_ij )
 {
 	follow_convoi = convoihandle_t();
+	switch_underground_mode(new_ij);
 	change_world_position( get_map2d_coord( new_ij ) );
 }
 
 
 void viewport_t::change_world_position(const koord3d& pos, const koord& off, scr_coord sc)
 {
+	switch_underground_mode(pos);
 	// see get_viewport_coord and update_cached_values
 	koord scr_pos_2d = pos.get_2d() - view_ij_off;
 
@@ -173,8 +195,8 @@ grund_t* viewport_t::get_ground_on_screen_coordinate(scr_coord screen_pos, sint3
 	grund_t *gr = NULL;
 	// for the calculation of hmin/hmax see simview.cc
 	// for the definition of underground_level see grund_t::set_underground_mode
-	const sint8 hmin = grund_t::underground_mode != grund_t::ugm_all ? min( world->get_groundwater() - 4, grund_t::underground_level ) : world->get_minimumheight();
-	const sint8 hmax = grund_t::underground_mode == grund_t::ugm_all ? world->get_maximumheight() : min( grund_t::underground_level, world->get_maximumheight() );
+	const sint8 hmin = grund_t::underground_mode != grund_t::ugm_all ? min( world->get_groundwater() - 4, grund_t::underground_level ) : world->get_min_allowed_height();
+	const sint8 hmax = grund_t::underground_mode == grund_t::ugm_all ? world->get_max_allowed_height() : min( grund_t::underground_level, world->get_max_allowed_height() );
 
 	// find matching and visible grund
 	for(sint8 hgt = hmax; hgt>=hmin; hgt--) {

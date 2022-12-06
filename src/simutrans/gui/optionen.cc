@@ -44,7 +44,7 @@ static char const *const option_buttons_text[] =
 	"Sprache", "Neue Karte",
 	"Spieler(mz)", "Load game",
 	"Farbe", "Speichern",
-	"Helligk.", "Load scenario",
+	"Display settings", "Load scenario",
 	"Sound", "Scenario", "Install",
 	"Beenden"
 };
@@ -79,10 +79,6 @@ optionen_gui_t::optionen_gui_t() :
 	set_windowsize(get_min_windowsize());
 	set_resizemode(gui_frame_t::horizontal_resize);
 }
-
-
-// helper for pakinstall
-static bool finish_install() { return pakinstaller_t::finish_install; }
 
 
 /**
@@ -130,18 +126,21 @@ bool optionen_gui_t::action_triggered( gui_action_creator_t *comp,value_t /* */)
 		delete tmp_tool;
 	}
 	else if (comp == option_buttons + BUTTON_NEW_GAME) {
-		destroy_all_win(true);
-		welt->stop(false);
+		// create new world
+		tool_t::simple_tool[TOOL_QUIT]->set_default_param("n");
+		welt->set_tool(tool_t::simple_tool[TOOL_QUIT], NULL);
+		tool_t::simple_tool[TOOL_QUIT]->set_default_param(0);
 	}
 	else if (comp == option_buttons + BUTTON_INSTALL) {
 #if !defined(USE_OWN_PAKINSTALL)  &&  defined(_WIN32)
-		dr_download_pakset(env_t::data_dir, env_t::data_dir == env_t::user_dir);  // windows
+		dr_download_pakset(env_t::base_dir, env_t::base_dir == env_t::user_dir);  // windows
 #else
 		create_win(new pakinstaller_t(), w_info, magic_pakinstall);
 #endif
 	}
 	else if(  comp == option_buttons + BUTTON_QUIT  ) {
-		welt->stop(true);
+		// we call the proper tool for quitting
+		welt->set_tool(tool_t::simple_tool[TOOL_QUIT], NULL);
 	}
 	else {
 		// not our?

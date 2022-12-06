@@ -195,7 +195,7 @@ bool can_be_last(const vehicle_desc_t *desc)
 
 bool is_coupling_allowed(const vehicle_desc_t *desc1, const vehicle_desc_t *desc2)
 {
-	return desc1->can_lead(desc2)  &&  desc2->can_follow(desc1);
+	return desc1  &&  desc2  &&  desc1->can_lead(desc2)  &&  desc2->can_follow(desc1);
 }
 
 const vector_tpl<const vehicle_desc_t*>& get_predecessors(const vehicle_desc_t *desc)
@@ -517,11 +517,11 @@ void export_goods_desc(HSQUIRRELVM vm)
 	 */
 	register_method(vm, &building_desc_t::get_capacity, "get_capacity");
 	/**
-	 * @return whether building can be built underground
+	 * @return whether station building can be built underground
 	 */
 	register_method(vm, &building_desc_t::can_be_built_underground, "can_be_built_underground");
 	/**
-	 * @return whether building can be built above ground
+	 * @return whether station building can be built above ground
 	 */
 	register_method(vm, &building_desc_t::can_be_built_aboveground, "can_be_built_aboveground");
 	/**
@@ -560,6 +560,12 @@ void export_goods_desc(HSQUIRRELVM vm)
 	enum_slot(vm, "station", (uint8)building_desc_t::generic_stop, true);
 	/// station extension
 	enum_slot(vm, "station_extension", (uint8)building_desc_t::generic_extension, true);
+	/// city building: residential
+	enum_slot(vm, "city_res", (uint8)building_desc_t::city_res, true);
+	/// city building: commercial
+	enum_slot(vm, "city_com", (uint8)building_desc_t::city_com, true);
+	/// city building: industrial
+	enum_slot(vm, "city_ind", (uint8)building_desc_t::city_ind, true);
 	end_enum();
 	/**
 	 * @returns building type
@@ -587,7 +593,7 @@ void export_goods_desc(HSQUIRRELVM vm)
 	 * Entries are of type @ref building_desc_x.
 	 * @param type building type from @ref building_desc_x::building_type
 	 * @param wt waytype (can be wt_all to ignore waytype of desc)
-	 * @param freight station should accept this freight (if null then return all buildings)
+	 * @param freight station should accept this freight (if equal to {}, i.e., empty table, then return all buildings)
 	 * @returns the list
 	 */
 	STATIC register_method(vm, &get_available_stations, "get_available_stations", false, true);

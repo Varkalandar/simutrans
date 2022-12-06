@@ -60,6 +60,7 @@
 #include "../obj/groundobj.h"
 #include "../obj/gebaeude.h"
 #include "../obj/leitung2.h"
+#include "../obj/wolke.h"
 
 #include "../gui/password_frame.h"
 #include "../gui/messagebox.h"
@@ -82,6 +83,7 @@
 #include "../dataobj/environment.h"
 #include "../dataobj/powernet.h"
 #include "../dataobj/records.h"
+#include "../dataobj/pakset_manager.h"
 
 #include "../utils/cbuffer.h"
 #include "../utils/simrandom.h"
@@ -126,7 +128,6 @@ static std::string last_network_game;
 
 karte_t* karte_t::world = NULL;
 
-stringhashtable_tpl<karte_t::missing_level_t>missing_pak_names;
 
 #ifdef MULTI_THREAD
 #include "../utils/simthread.h"
@@ -284,9 +285,9 @@ void karte_t::recalc_season_snowline(bool set_pending)
 		pending_season_change++;
 	}
 
-	const sint16 winterline = settings.get_winter_snowline();
-	const sint16 summerline = max(settings.get_climate_borders(arctic_climate,1),settings.get_climate_borders(arctic_climate,0));
-	snowline = summerline - (sint16)(((summerline-winterline)*factor)/100);
+	const sint8 winterline = settings.get_winter_snowline();
+	const sint8 summerline = max(settings.get_climate_borders(arctic_climate,1),settings.get_climate_borders(arctic_climate,0));
+	snowline = summerline - (sint8)(((summerline-winterline)*factor)/100);
 	if(  old_snowline != snowline  &&  set_pending  ) {
 		pending_snowline_change++;
 	}
@@ -300,7 +301,7 @@ void karte_t::perlin_hoehe_loop( sint16 x_min, sint16 x_max, sint16 y_min, sint1
 			// loop all tiles
 			koord k(x,y);
 			sint16 const h = perlin_hoehe(&settings, k, koord(0, 0));
-			set_grid_hgt( k, (sint8) h);
+			set_grid_hgt_nocheck( k, (sint8) h);
 		}
 	}
 }
@@ -355,7 +356,7 @@ void karte_t::cleanup_grounds_loop( sint16 x_min, sint16 x_max, sint16 y_min, si
 			}
 
 			if(  max_hgt_nocheck(k) > water_hgt  ) {
-				set_water_hgt(k, groundwater-4);
+				set_water_hgt_nocheck(k, groundwater-4);
 			}
 		}
 	}
@@ -439,8 +440,8 @@ void karte_t::destroy()
 
 	// removes all moving stuff from the sync_step
 	sync.clear();
-	sync_eyecandy.clear();
-	sync_way_eyecandy.clear();
+	sync_buildings.clear();
+	sync_roadsigns.clear();
 	old_progress += cached_size.x*cached_size.y;
 	ls.set_progress( old_progress );
 	DBG_MESSAGE("karte_t::destroy()", "sync list cleared");
@@ -1227,8 +1228,8 @@ void karte_t::init(settings_t* const sets, sint8 const* const h_field)
 	recalc_average_speed(); // resets timeline
 	koord::locality_factor = settings.get_locality_factor( last_year );
 
-	world_maximum_height = sets->get_maximumheight();
-	world_minimum_height = sets->get_minimumheight();
+	max_allowed_height = sets->get_maximumheight();
+	min_allowed_height = sets->get_minimumheight();
 	groundwater = (sint8)sets->get_groundwater();
 
 	init_height_to_climate();
@@ -1326,7 +1327,6 @@ DBG_DEBUG("karte_t::init()","built timeline");
 
 
 #define array_koord(px,py) (px + py * get_size().x)
-
 
 /* Lakes:
  * For each height from groundwater+1 to max_lake_height we loop over
@@ -1479,96 +1479,6 @@ void karte_t::create_lakes(  int xoff, int yoff, sint8 max_lake_height  )
 }
 
 
-bool karte_t::can_flood_to_depth(  koord k, sint8 new_water_height, sint8 *stage, sint8 *our_stage, sint16 x_min, sint16 x_max, sint16 y_min, sint16 y_max  ) const
-{
-	bool succeeded = true;
-	if(  k == koord::invalid  ) {
-		return false;
-	}
-
-	if(  new_water_height < get_groundwater() - 3  ) {
-		return false;
-	}
-
-	// make a list of tiles to change
-	// cannot use a recursive method as stack is not large enough!
-
-	sint8 *from_dir = new sint8[get_size().x * get_size().y];
-	bool local_stage = (our_stage==NULL);
-
-	if(  local_stage  ) {
-		our_stage = new sint8[get_size().x * get_size().y];
-	}
-
-	memset( our_stage + sizeof(sint8) * array_koord(0,y_min), -1, sizeof(sint8) * get_size().x * (y_max-y_min) );
-
-	uint32 offset = array_koord(k.x,k.y);
-	from_dir[offset]=-1;
-	stage[offset]=0;
-	our_stage[offset]=0;
-
-	do {
-		koord k_neighbour = k + koord::neighbours[our_stage[offset]];
-		if(  k_neighbour.x < x_min  ||  k_neighbour.x>=x_max) {
-			succeeded = false;
-		} else if(  k_neighbour.y >= y_min  &&  k_neighbour.y<y_max  ) {
-			const uint32 neighbour_offset = array_koord(k_neighbour.x,k_neighbour.y);
-
-			// already visited
-			if(our_stage[neighbour_offset] != -1) goto next_neighbour;
-
-			// land or water height above
-			if(max_water_hgt[neighbour_offset] >= new_water_height) goto next_neighbour;
-
-			//move on to next tile
-			from_dir[neighbour_offset] = our_stage[offset];
-			stage[neighbour_offset] = 0;
-			our_stage[neighbour_offset] = 0;
-			k = k_neighbour;
-			offset = neighbour_offset;
-			continue;
-		}
-		else if(  succeeded  &&  (global_lake_fill  ||  k_neighbour.y < 1  ||  k_neighbour.y>=get_size().y-1)  ) {
-			// edge of map - we keep iterating so we can mark all connected tiles as failing
-			succeeded = false;
-		}
-		next_neighbour:
-		//return back to previous tile
-		while(  our_stage[offset]==7  ) {
-			if(  from_dir[offset] == -1  ) goto exit_iteration;    // for natural maps only need to have checked one path out from original tile
-			k = k - koord::neighbours[from_dir[offset]];
-			offset = array_koord(k.x,k.y);
-		}
-		our_stage[offset]++;
-	} while(  true  );
-
-	exit_iteration:
-
-	delete [] from_dir;
-
-	if(  local_stage  ) {
-		delete [] our_stage;
-	}
-
-	return succeeded;
-}
-
-
-void karte_t::flood_to_depth( sint8 new_water_height, sint8 *stage )
-{
-	const uint16 size_x = get_size().x;
-	const uint16 size_y = get_size().y;
-
-	uint32 offset_max = size_x*size_y;
-	for(  uint32 offset = 0;  offset < offset_max;  offset++  ) {
-		if(  stage[offset] == -1  ) {
-			continue;
-		}
-		water_hgts[offset] = new_water_height;
-	}
-}
-
-
 void karte_t::create_beaches(  int xoff, int yoff  )
 {
 	const uint16 size_x = get_size().x;
@@ -1610,7 +1520,7 @@ void karte_t::create_beaches(  int xoff, int yoff  )
 
 				// if not much nearby water then turn into a beach
 				if(  neighbour_water < (3*total_ground)/4  ) {
-					set_water_hgt( k, gr->get_hoehe() - 1 );
+					set_water_hgt_nocheck( k, gr->get_hoehe() - 1 );
 					raise_grid_to( ix, iy, gr->get_hoehe() );
 					raise_grid_to( ix + 1, iy, gr->get_hoehe() );
 					raise_grid_to( ix, iy + 1, gr->get_hoehe() );
@@ -1676,40 +1586,6 @@ void karte_t::create_beaches(  int xoff, int yoff  )
 }
 
 
-void karte_t::init_height_to_climate()
-{
-	// mark unused as arctic
-	memset( num_climates_at_height, 0, lengthof(num_climates_at_height) );
-
-	// now just add them, the later climates will win (we will do a fineer assessment later
-	for( int cl=0;  cl<MAX_CLIMATES;  cl++ ) {
-		DBG_DEBUG( "init_height_to_climate()", "climate %i, start %i end %i", cl,  settings.get_climate_borders( cl, 0 ),  settings.get_climate_borders( cl, 1 ) );
-		for( sint8 h = max(groundwater, settings.get_climate_borders( cl, 0 )); h < settings.get_climate_borders( cl, 1 ); h++ ) {
-			if(  num_climates_at_height[ h - groundwater ] == 0  ) {
-				// default climate for this height is the first matching one
-				height_to_climate[ h - groundwater ] = (uint8)cl;
-			}
-			num_climates_at_height[h-groundwater]++;
-		}
-	}
-	for( int h = 0; h < 128; h++ ) {
-		if(  num_climates_at_height[h]==0  ) {
-			if( h == 0 ) {
-				height_to_climate[ h ] = desert_climate;
-			}
-			else if( h - groundwater > settings.get_climate_borders( arctic_climate, 1 ) ) {
-				height_to_climate[ h ] = arctic_climate;
-			}
-			else {
-				height_to_climate[ h ] = temperate_climate;
-			}
-			num_climates_at_height[ h ] = 1;
-		}
-		DBG_DEBUG( "init_height_to_climate()", "Height %i, climate %i, num_climates %i", h - groundwater, height_to_climate[ h ], num_climates_at_height[ h ] );
-	}
-}
-
-
 void karte_t::distribute_trees_region( sint16 xtop, sint16 ytop, sint16 xbottom, sint16 ybottom  )
 {
 	// now distribute trees
@@ -1765,28 +1641,26 @@ void karte_t::distribute_trees_region( sint16 xtop, sint16 ytop, sint16 xbottom,
 
 void karte_t::enlarge_map(settings_t const* sets, sint8 const* const h_field)
 {
-	sint16 new_size_x = sets->get_size_x();
-	sint16 new_size_y = sets->get_size_y();
+	const koord new_size(sets->get_size_x(), sets->get_size_y());
 
-	if(  cached_grid_size.y>0  &&  cached_grid_size.y!=new_size_y  ) {
+	if(  cached_grid_size.y>0  &&  cached_grid_size.y!=new_size.y  ) {
 		// to keep the labels
-		grund_t::enlarge_map( new_size_x, new_size_y );
+		grund_t::enlarge_map( new_size.x, new_size.y );
 	}
 
-	planquadrat_t *new_plan = new planquadrat_t[new_size_x*new_size_y];
-	sint8 *new_grid_hgts = new sint8[(new_size_x + 1) * (new_size_y + 1)];
-	sint8 *new_water_hgts = new sint8[new_size_x * new_size_y];
+	planquadrat_t *new_plan = new planquadrat_t[new_size.x*new_size.y];
+	sint8 *new_grid_hgts = new sint8[(new_size.x + 1) * (new_size.y + 1)];
+	sint8 *new_water_hgts = new sint8[new_size.x * new_size.y];
 
-	memset( new_grid_hgts, groundwater, sizeof(sint8) * (new_size_x + 1) * (new_size_y + 1) );
-	memset( new_water_hgts, groundwater, sizeof(sint8) * new_size_x * new_size_y );
+	memset( new_grid_hgts, groundwater, sizeof(sint8) * (new_size.x + 1) * (new_size.y + 1) );
+	memset( new_water_hgts, groundwater, sizeof(sint8) * new_size.x * new_size.y );
 
-	sint16 old_x = cached_grid_size.x;
-	sint16 old_y = cached_grid_size.y;
+	const koord old_size = get_size();
+	const bool new_world = old_size.x == 0 && old_size.y == 0;
 
-	settings.set_size_x(new_size_x);
-	settings.set_size_y(new_size_y);
-	cached_grid_size.x = new_size_x;
-	cached_grid_size.y = new_size_y;
+	settings.set_size_x(new_size.x);
+	settings.set_size_y(new_size.y);
+	cached_grid_size = new_size;
 	cached_size_max = max(cached_grid_size.x,cached_grid_size.y);
 	cached_size.x = cached_grid_size.x-1;
 	cached_size.y = cached_grid_size.y-1;
@@ -1797,8 +1671,7 @@ void karte_t::enlarge_map(settings_t const* sets, sint8 const* const h_field)
 
 	int max_display_progress;
 
-	// If this is not called by karte_t::init
-	if(  old_x != 0  ) {
+	if(  !new_world  ) {
 		mute_sound(true);
 		minimap_t::is_visible = false;
 
@@ -1807,18 +1680,18 @@ void karte_t::enlarge_map(settings_t const* sets, sint8 const* const h_field)
 		}
 
 // Copy old values:
-		for (sint16 iy = 0; iy<old_y; iy++) {
-			for (sint16 ix = 0; ix<old_x; ix++) {
-				uint32 nr = ix+(iy*old_x);
-				uint32 nnr = ix+(iy*new_size_x);
+		for (sint16 iy = 0; iy<old_size.y; iy++) {
+			for (sint16 ix = 0; ix<old_size.x; ix++) {
+				uint32 nr = ix+(iy*old_size.x);
+				uint32 nnr = ix+(iy*new_size.x);
 				swap(new_plan[nnr], plan[nr]);
 				new_water_hgts[nnr] = water_hgts[nr];
 			}
 		}
-		for (sint16 iy = 0; iy<=old_y; iy++) {
-			for (sint16 ix = 0; ix<=old_x; ix++) {
-				uint32 nr = ix+(iy*(old_x+1));
-				uint32 nnr = ix+(iy*(new_size_x+1));
+		for (sint16 iy = 0; iy<=old_size.y; iy++) {
+			for (sint16 ix = 0; ix<=old_size.x; ix++) {
+				uint32 nr = ix+(iy*(old_size.x+1));
+				uint32 nnr = ix+(iy*(new_size.x+1));
 				new_grid_hgts[nnr] = grid_hgts[nr];
 			}
 		}
@@ -1827,7 +1700,7 @@ void karte_t::enlarge_map(settings_t const* sets, sint8 const* const h_field)
 	else {
 		max_display_progress = 16 + sets->get_city_count() * 4 + settings.get_factory_count();
 	}
-	loadingscreen_t ls( translator::translate( old_x ? "enlarge map" : "Init map ..."), max_display_progress, true, true );
+	loadingscreen_t ls( translator::translate( new_world ? "Init map ..." : "enlarge map"), max_display_progress, true, true );
 
 	delete [] plan;
 	plan = new_plan;
@@ -1836,7 +1709,7 @@ void karte_t::enlarge_map(settings_t const* sets, sint8 const* const h_field)
 	delete [] water_hgts;
 	water_hgts = new_water_hgts;
 
-	if(  old_x==0  ) {
+	if(  new_world  ) {
 		// init max and min with defaults
 		max_height = groundwater;
 		min_height = groundwater;
@@ -1846,7 +1719,7 @@ void karte_t::enlarge_map(settings_t const* sets, sint8 const* const h_field)
 	clear_random_mode( 0xFFFF );
 	set_random_mode( MAP_CREATE_RANDOM );
 
-	if(  old_x == 0  &&  !settings.heightfield.empty()  ) {
+	if(  new_world  &&  !settings.heightfield.empty()  ) {
 		// init from file
 		for(int y=0; y<cached_grid_size.y; y++) {
 			for(int x=0; x<cached_grid_size.x; x++) {
@@ -1861,17 +1734,17 @@ void karte_t::enlarge_map(settings_t const* sets, sint8 const* const h_field)
 	else {
 		if(  sets->get_rotation()==0  &&  sets->get_origin_x()==0  &&  sets->get_origin_y()==0) {
 			// otherwise negative offsets may occur, so we cache only non-rotated maps
-			init_perlin_map(new_size_x,new_size_y);
+			init_perlin_map(new_size.x,new_size.y);
 		}
-		if (  old_x > 0  &&  old_y > 0  ) {
+		if (  old_size.x > 0  &&  old_size.y > 0  ) {
 			// loop only new tiles:
-			for(  sint16 y = 0;  y<=new_size_y;  y++  ) {
-				for(  sint16 x = (y>old_y) ? 0 : old_x+1;  x<=new_size_x;  x++  ) {
+			for(  sint16 y = 0;  y<=new_size.y;  y++  ) {
+				for(  sint16 x = (y>old_size.y) ? 0 : old_size.x+1;  x<=new_size.x;  x++  ) {
 					koord k(x,y);
-					sint16 const h = perlin_hoehe(&settings, k, koord(old_x, old_y));
-					set_grid_hgt( k, (sint8) h);
+					sint16 const h = perlin_hoehe(&settings, k, koord(old_size.x, old_size.y));
+					set_grid_hgt_nocheck( k, (sint8) h);
 				}
-				ls.set_progress( (y*16)/new_size_y );
+				ls.set_progress( (y*16)/new_size.y );
 			}
 		}
 		else {
@@ -1896,40 +1769,40 @@ void karte_t::enlarge_map(settings_t const* sets, sint8 const* const h_field)
 	grund_t *gr;
 	sint8 h;
 
-	if ( old_x > 0  &&  old_y > 0){
-		for(i=0; i<old_x; i++) {
-			gr = lookup_kartenboden_nocheck(i, old_y-1);
+	if (!new_world) {
+		for(i=0; i<old_size.x; i++) {
+			gr = lookup_kartenboden_nocheck(i, old_size.y-1);
 			if (!gr->is_water()) {
 				h = gr->get_hoehe(slope4_t::corner_SW);
-				raise_grid_to(i, old_y+1, h);
-				lower_grid_to(i, old_y+1, h );
+				raise_grid_to(i, old_size.y+1, h);
+				lower_grid_to(i, old_size.y+1, h );
 			}
 		}
-		for(i=0; i<old_y; i++) {
-			gr = lookup_kartenboden_nocheck(old_x-1, i);
+		for(i=0; i<old_size.y; i++) {
+			gr = lookup_kartenboden_nocheck(old_size.x-1, i);
 			if (!gr->is_water()) {
 				h = gr->get_hoehe(slope4_t::corner_NE);
-				raise_grid_to(old_x+1, i, h);
-				lower_grid_to(old_x+1, i, h);
+				raise_grid_to(old_size.x+1, i, h);
+				lower_grid_to(old_size.y+1, i, h);
 			}
 		}
-		gr = lookup_kartenboden_nocheck(old_x-1, old_y -1);
+		gr = lookup_kartenboden_nocheck(old_size.x-1, old_size.y -1);
 		if (!gr->is_water()) {
 			h = gr->get_hoehe(slope4_t::corner_SE);
-			raise_grid_to(old_x+1, old_y+1, h);
-			lower_grid_to(old_x+1, old_y+1, h);
+			raise_grid_to(old_size.x+1, old_size.y+1, h);
+			lower_grid_to(old_size.x+1, old_size.y+1, h);
 		}
 	}
 
 	// smooth the new part, reassign slopes on new part
-	cleanup_karte( old_x, old_y );
-	if (  old_x == 0  &&  old_y == 0  ) {
+	cleanup_karte( old_size.x, old_size.y );
+	if (  new_world  ) {
 		ls.set_progress(10);
 	}
 
 	// update height bounds
-	for(  sint16 iy = 0;  iy < new_size_y;  iy++  ) {
-		for(  sint16 ix = (iy >= old_y) ? 0 : max( old_x, 0 );  ix < new_size_x;  ix++  ) {
+	for(  sint16 iy = 0;  iy < new_size.y;  iy++  ) {
+		for(  sint16 ix = (iy >= old_size.y) ? 0 : max( old_size.x, 0 );  ix < new_size.x;  ix++  ) {
 			sint8 hgt = lookup_kartenboden_nocheck(ix, iy)->get_hoehe();
 			if (hgt < min_height) {
 				min_height = hgt;
@@ -1940,13 +1813,13 @@ void karte_t::enlarge_map(settings_t const* sets, sint8 const* const h_field)
 		}
 	}
 
-	if (  old_x == 0  &&  old_y == 0  ) {
+	if (  new_world  ) {
 		ls.set_progress(12);
 	}
 
 	DBG_DEBUG("karte_t::distribute_groundobjs_cities()","distributing rivers");
 	if(  sets->get_lakeheight() > get_groundwater()  ) {
-		create_lakes( old_x, old_y, sets->get_lakeheight() );
+		create_lakes( old_size.x, old_size.y, sets->get_lakeheight() );
 	}
 
 	// so at least some rivers end or start in lakes
@@ -1954,84 +1827,85 @@ void karte_t::enlarge_map(settings_t const* sets, sint8 const* const h_field)
 		create_rivers( settings.get_river_number() );
 	}
 
-	if (  old_x == 0  &&  old_y == 0  ) {
+	if (  new_world  ) {
 		ls.set_progress(13);
 	}
 
 	// set climates in new area
-	if( old_x == 0   &&  old_y == 0 ) {
-		calc_climate_map_region( 0, 0, new_size_x, new_size_y );
+	if( new_world ) {
+		calc_climate_map_region( 0, 0, new_size.x, new_size.y );
 	}
 	else {
-		calc_climate_map_region( 0, old_y, old_x, new_size_y );
-		calc_climate_map_region( old_x, 0, new_size_x, new_size_y );
+		calc_climate_map_region( 0, old_size.y, old_size.x, new_size.y );
+		calc_climate_map_region( old_size.x, 0, new_size.x, new_size.y );
 	}
 
-	if (  old_x == 0  &&  old_y == 0  ) {
+	if (  new_world  ) {
 		ls.set_progress(14);
 	}
 
-	create_beaches( old_x, old_y );
-	if (  old_x == 0  &&  old_y == 0  ) {
+	create_beaches( old_size.x, old_size.y );
+	if (  new_world  ) {
 		ls.set_progress(15);
 	}
 
-	if (  old_x > 0  &&  old_y > 0  ) {
-		// and calculate transitions in a 1 tile larger area
-		for(  sint16 iy = 0;  iy < new_size_y;  iy++  ) {
-			for(  sint16 ix = (iy >= old_y - 20) ? 0 : max( old_x - 20, 0 );  ix < new_size_x;  ix++  ) {
-				recalc_transitions( koord( ix, iy ) );
-			}
-		}
-	}
-	else {
+	if (  new_world  ) {
 		// new world -> calculate all transitions
 		world_xy_loop(&karte_t::recalc_transitions_loop, 0);
 		ls.set_progress(16);
 	}
+	else {
+		// and calculate transitions in a 1 tile larger area
+		for(  sint16 iy = 0;  iy < new_size.y;  iy++  ) {
+			for(  sint16 ix = (iy >= old_size.y - 20) ? 0 : max( old_size.x - 20, 0 );  ix < new_size.x;  ix++  ) {
+				recalc_transitions( koord( ix, iy ) );
+			}
+		}
+	}
 
 	// now recalc the images of the old map near the seam ...
-	for(  sint16 y = 0;  y < old_y - 20;  y++  ) {
-		for(  sint16 x = max( old_x - 20, 0 );  x < old_x;  x++  ) {
-			lookup_kartenboden_nocheck(x,y)->calc_image();
-		}
-	}
-	for(  sint16 y = max( old_y - 20, 0 );  y < old_y;  y++) {
-		for(  sint16 x = 0;  x < old_x;  x++  ) {
+	for(  sint16 y = 0;  y < old_size.y - 20;  y++  ) {
+		for(  sint16 x = max( old_size.x - 20, 0 );  x < old_size.x;  x++  ) {
 			lookup_kartenboden_nocheck(x,y)->calc_image();
 		}
 	}
 
-	distribute_cities( sets->get_city_count(), sets->get_mean_citizen_count(), old_x, old_y );
+	for(  sint16 y = max( old_size.y - 20, 0 );  y < old_size.y;  y++) {
+		for(  sint16 x = 0;  x < old_size.x;  x++  ) {
+			lookup_kartenboden_nocheck(x,y)->calc_image();
+		}
+	}
 
-	if( old_x == 0   &&  old_y == 0 ) {
-		distribute_trees_region( 0, 0, new_size_x, new_size_y );
+	distribute_cities( sets->get_city_count(), sets->get_mean_citizen_count(), old_size.x, old_size.y );
+
+	if( new_world ) {
+		distribute_trees_region( 0, 0, new_size.x, new_size.y );
 	}
 	else {
-		distribute_trees_region( 0, old_y, old_x, new_size_y );
-		distribute_trees_region( old_x, 0, new_size_x, new_size_y );
+		distribute_trees_region( 0, old_size.y, old_size.x, new_size.y );
+		distribute_trees_region( old_size.x, 0, new_size.x, new_size.y );
 	}
 	humidity_map.clear();
 
 	// eventual update origin
 	switch(  settings.get_rotation()  ) {
 		case 1: {
-			settings.set_origin_y( settings.get_origin_y() - new_size_y + old_y );
+			settings.set_origin_y( settings.get_origin_y() - new_size.y + old_size.y );
 			break;
 		}
 		case 2: {
-			settings.set_origin_x( settings.get_origin_x() - new_size_x + old_x );
-			settings.set_origin_y( settings.get_origin_y() - new_size_y + old_y );
+			settings.set_origin_x( settings.get_origin_x() - new_size.x + old_size.x );
+			settings.set_origin_y( settings.get_origin_y() - new_size.y + old_size.y );
 			break;
 		}
 		case 3: {
-			settings.set_origin_x( settings.get_origin_x() - new_size_y + old_y );
+			settings.set_origin_x( settings.get_origin_x() - new_size.y + old_size.y );
 			break;
 		}
 	}
 
-	distribute_groundobjs(old_x, old_y);
-	distribute_movingobjs(old_x, old_y);
+	distribute_groundobjs(old_size.x, old_size.y);
+	distribute_movingobjs(old_size.x, old_size.y);
 
 	// hausbauer_t::new_world(); <- this would reinit monuments! do not do this!
 	factory_builder_t::new_world();
@@ -2040,16 +1914,16 @@ void karte_t::enlarge_map(settings_t const* sets, sint8 const* const h_field)
 	// Refresh the haltlist for the affected tiles / stations.
 	// It is enough to check the tile just at the border ...
 	uint16 const cov = settings.get_station_coverage();
-	if(  old_y < new_size_y  ) {
-		for(  sint16 y=0;  y<old_y;  y++  ) {
-			for(  sint16 x=max(0,old_x-cov);  x<old_x;  x++  ) {
+	if(  old_size.y < new_size.y  ) {
+		for(  sint16 y=0;  y<old_size.y;  y++  ) {
+			for(  sint16 x=max(0,old_size.x-cov);  x<old_size.x;  x++  ) {
 				const planquadrat_t* pl = access_nocheck(x,y);
 				for(  uint8 i=0;  i < pl->get_boden_count();  i++  ) {
 					// update halt
 					halthandle_t h = pl->get_boden_bei(i)->get_halt();
 					if(  h.is_bound()  ) {
-						for(  sint16 xp=max(0,x-cov);  xp<min(new_size_x,x+cov+1);  xp++  ) {
-							for(  sint16 yp=y;  yp<min(new_size_y,y+cov+1);  yp++  ) {
+						for(  sint16 xp=max(0,x-cov);  xp<min(new_size.x,x+cov+1);  xp++  ) {
+							for(  sint16 yp=y;  yp<min(new_size.y,y+cov+1);  yp++  ) {
 								access_nocheck(xp,yp)->add_to_haltlist(h);
 							}
 						}
@@ -2058,16 +1932,16 @@ void karte_t::enlarge_map(settings_t const* sets, sint8 const* const h_field)
 			}
 		}
 	}
-	if(  old_x < new_size_x  ) {
-		for(  sint16 y=max(0,old_y-cov);  y<old_y;  y++  ) {
-			for(  sint16 x=0;  x<old_x;  x++  ) {
+	if(  old_size.x < new_size.x  ) {
+		for(  sint16 y=max(0,old_size.y-cov);  y<old_size.y;  y++  ) {
+			for(  sint16 x=0;  x<old_size.x;  x++  ) {
 				const planquadrat_t* pl = access_nocheck(x,y);
 				for(  uint8 i=0;  i < pl->get_boden_count();  i++  ) {
 					// update halt
 					halthandle_t h = pl->get_boden_bei(i)->get_halt();
 					if(  h.is_bound()  ) {
-						for(  sint16 xp=x;  xp<min(new_size_x,x+cov+1);  xp++  ) {
-							for(  sint16 yp=max(0,y-cov);  yp<min(new_size_y,y+cov+1);  yp++  ) {
+						for(  sint16 xp=x;  xp<min(new_size.x,x+cov+1);  xp++  ) {
+							for(  sint16 yp=max(0,y-cov);  yp<min(new_size.y,y+cov+1);  yp++  ) {
 								access_nocheck(xp,yp)->add_to_haltlist(h);
 							}
 						}
@@ -2078,7 +1952,7 @@ void karte_t::enlarge_map(settings_t const* sets, sint8 const* const h_field)
 	}
 	clear_random_mode( MAP_CREATE_RANDOM );
 
-	if ( old_x != 0 ) {
+	if ( !new_world ) {
 		if(is_display_init()) {
 			display_show_pointer(true);
 		}
@@ -2092,6 +1966,7 @@ void karte_t::enlarge_map(settings_t const* sets, sint8 const* const h_field)
 		set_dirty();
 		reset_timer();
 	}
+
 	// update main menu
 	tool_t::update_toolbars();
 }
@@ -2100,8 +1975,6 @@ void karte_t::enlarge_map(settings_t const* sets, sint8 const* const h_field)
 
 karte_t::karte_t() :
 	settings(env_t::default_settings),
-	climate_map(0,0),
-	humidity_map(0,0),
 	convoi_array(0),
 	attractions(16),
 	stadt(0)
@@ -2138,10 +2011,6 @@ karte_t::karte_t() :
 	goods_manager_t::set_multiplier( 1000 );
 
 	zeiger = NULL;
-	plan = 0;
-
-	grid_hgts = 0;
-	water_hgts = 0;
 	schedule_counter = 0;
 	nosave_warning = nosave = false;
 	loaded_rotation = 0;
@@ -2160,8 +2029,6 @@ karte_t::karte_t() :
 	map_counter = 0;
 
 	msg = new message_t();
-	cached_size.x = 0;
-	cached_size.y = 0;
 
 	records = new records_t(this->msg);
 
@@ -2188,222 +2055,6 @@ karte_t::~karte_t()
 	if (world == this) {
 		world = NULL;
 	}
-}
-
-
-bool karte_t::is_plan_height_changeable(sint16 x, sint16 y) const
-{
-	const planquadrat_t *plan = access(x,y);
-	bool ok = true;
-
-	if(plan != NULL) {
-		grund_t *gr = plan->get_kartenboden();
-
-		ok = (gr->ist_natur() || gr->is_water())  &&  !gr->hat_wege()  &&  !gr->is_halt();
-
-		for(  int i=0; ok  &&  i<gr->get_top(); i++  ) {
-			const obj_t *obj = gr->obj_bei(i);
-			assert(obj != NULL);
-			ok =
-				obj->get_typ() == obj_t::baum  ||
-				obj->get_typ() == obj_t::zeiger  ||
-				obj->get_typ() == obj_t::wolke  ||
-				obj->get_typ() == obj_t::sync_wolke  ||
-				obj->get_typ() == obj_t::async_wolke  ||
-				obj->get_typ() == obj_t::groundobj;
-		}
-	}
-
-	return ok;
-}
-
-
-
-// raise height in the hgt-array
-void karte_t::raise_grid_to(sint16 x, sint16 y, sint8 h)
-{
-	if(is_within_grid_limits(x,y)) {
-		const sint32 offset = x + y*(cached_grid_size.x+1);
-
-		if(  grid_hgts[offset] < h  ) {
-			grid_hgts[offset] = h;
-
-			const sint8 hh = h - (ground_desc_t::double_grounds ? 2 : 1);
-
-			// set new height of neighbor grid points
-			raise_grid_to(x-1, y-1, hh);
-			raise_grid_to(x  , y-1, hh);
-			raise_grid_to(x+1, y-1, hh);
-			raise_grid_to(x-1, y  , hh);
-			raise_grid_to(x+1, y  , hh);
-			raise_grid_to(x-1, y+1, hh);
-			raise_grid_to(x  , y+1, hh);
-			raise_grid_to(x+1, y+1, hh);
-		}
-	}
-}
-
-
-int karte_t::grid_raise(const player_t *player, koord k, const char*&err)
-{
-	int n = 0;
-
-	if(is_within_grid_limits(k)) {
-
-		const grund_t *gr = lookup_kartenboden_gridcoords(k);
-		const slope4_t::type corner_to_raise = get_corner_to_operate(k);
-
-		const sint16 x = gr->get_pos().x;
-		const sint16 y = gr->get_pos().y;
-		const sint8 hgt = gr->get_hoehe(corner_to_raise);
-
-		sint8 hsw, hse, hne, hnw;
-		if(  !gr->is_water()  ) {
-			const sint8 f = ground_desc_t::double_grounds ?  2 : 1;
-			const sint8 o = ground_desc_t::double_grounds ?  1 : 0;
-
-			hsw = hgt - o + scorner_sw( corner_to_raise ) * f;
-			hse = hgt - o + scorner_se( corner_to_raise ) * f;
-			hne = hgt - o + scorner_ne( corner_to_raise ) * f;
-			hnw = hgt - o + scorner_nw( corner_to_raise ) * f;
-		}
-		else {
-			hsw = hse = hne = hnw = hgt;
-		}
-
-		terraformer_t digger(this, terraformer_t::raise);
-		digger.add_node(x, y, hsw, hse, hne, hnw);
-		digger.generate_affected_tile_list();
-
-		err = digger.can_raise_all(player);
-		if (err) {
-			return 0;
-		}
-		n = digger.apply();
-
-		// force world full redraw, or background could be dirty.
-		set_dirty();
-
-		if(  max_height < lookup_kartenboden_gridcoords(k)->get_hoehe()  ) {
-			max_height = lookup_kartenboden_gridcoords(k)->get_hoehe();
-		}
-	}
-	return (n+3)>>2;
-}
-
-
-
-void karte_t::lower_grid_to(sint16 x, sint16 y, sint8 h)
-{
-	if(is_within_grid_limits(x,y)) {
-		const sint32 offset = x + y*(cached_grid_size.x+1);
-
-		if(  grid_hgts[offset] > h  ) {
-			grid_hgts[offset] = h;
-			sint8 hh = h + 2;
-			// set new height of neighbor grid points
-			lower_grid_to(x-1, y-1, hh);
-			lower_grid_to(x  , y-1, hh);
-			lower_grid_to(x+1, y-1, hh);
-			lower_grid_to(x-1, y  , hh);
-			lower_grid_to(x+1, y  , hh);
-			lower_grid_to(x-1, y+1, hh);
-			lower_grid_to(x  , y+1, hh);
-			lower_grid_to(x+1, y+1, hh);
-		}
-	}
-}
-
-
-int karte_t::grid_lower(const player_t *player, koord k, const char*&err)
-{
-	int n = 0;
-
-	if(is_within_grid_limits(k)) {
-
-		const grund_t *gr = lookup_kartenboden_gridcoords(k);
-		const slope4_t::type corner_to_lower = get_corner_to_operate(k);
-
-		const sint16 x = gr->get_pos().x;
-		const sint16 y = gr->get_pos().y;
-		const sint8 hgt = gr->get_hoehe(corner_to_lower);
-
-		const sint8 f = ground_desc_t::double_grounds ?  2 : 1;
-		const sint8 o = ground_desc_t::double_grounds ?  1 : 0;
-		const sint8 hsw = hgt + o - scorner_sw( corner_to_lower ) * f;
-		const sint8 hse = hgt + o - scorner_se( corner_to_lower ) * f;
-		const sint8 hne = hgt + o - scorner_ne( corner_to_lower ) * f;
-		const sint8 hnw = hgt + o - scorner_nw( corner_to_lower ) * f;
-
-		terraformer_t digger(this, terraformer_t::lower);
-		digger.add_node(x, y, hsw, hse, hne, hnw);
-		digger.generate_affected_tile_list();
-
-		err = digger.can_lower_all(player);
-		if (err) {
-			return 0;
-		}
-
-		n = digger.apply();
-		err = NULL;
-
-		// force world full redraw, or background could be dirty.
-		set_dirty();
-
-		if(  min_height > min_hgt_nocheck( koord(x,y) )  ) {
-			min_height = min_hgt_nocheck( koord(x,y) );
-		}
-	}
-	return (n+3)>>2;
-}
-
-
-bool karte_t::can_flatten_tile(player_t *player, koord k, sint8 hgt, bool keep_water, bool make_underwater_hill)
-{
-	return flatten_tile(player, k, hgt, keep_water, make_underwater_hill, true /* just check */);
-}
-
-
-// make a flat level at this position (only used for AI at the moment)
-bool karte_t::flatten_tile(player_t *player, koord k, sint8 hgt, bool keep_water, bool make_underwater_hill, bool justcheck)
-{
-	int n = 0;
-	bool ok = true;
-	const grund_t *gr = lookup_kartenboden(k);
-	const slope_t::type slope = gr->get_grund_hang();
-	const sint8 old_hgt = make_underwater_hill  &&  gr->is_water() ? min_hgt(k) : gr->get_hoehe();
-	const sint8 max_hgt = old_hgt + slope_t::max_diff(slope);
-	if(  max_hgt > hgt  ) {
-
-		terraformer_t digger(this, terraformer_t::lower);
-		digger.add_node(k.x, k.y, hgt, hgt, hgt, hgt);
-		digger.generate_affected_tile_list();
-
-		ok = digger.can_lower_all(player) == NULL;
-
-		if (ok  &&  !justcheck) {
-			n += digger.apply();
-		}
-	}
-
-	if(  ok  &&  old_hgt < hgt  ) {
-		terraformer_t digger(this, terraformer_t::raise);
-		digger.add_node(k.x, k.y, hgt, hgt, hgt, hgt);
-		digger.generate_affected_tile_list();
-
-		ok = digger.can_raise_all(player, keep_water) == NULL;
-
-		if (ok  &&  !justcheck) {
-			n += digger.apply();
-		}
-	}
-
-	// was changed => pay for it
-	if(n>0) {
-		n = (n+3) / 4;
-		player_t::book_construction_costs(player, n * settings.cst_alter_land, k, ignore_wt);
-	}
-	return ok;
 }
 
 
@@ -2518,8 +2169,9 @@ bool karte_t::change_player_tool(uint8 cmd, uint8 player_nr, uint16 param, bool 
 }
 
 
-void karte_t::set_tool( tool_t *tool_in, player_t *player )
+void karte_t::set_tool_api( tool_t *tool_in, player_t *player, bool& suspended, bool called_from_script)
 {
+	suspended = false;
 	if(  get_random_mode()&LOAD_RANDOM  ) {
 		dbg->warning("karte_t::set_tool", "Ignored tool %s during loading.", tool_in->get_name() );
 		return;
@@ -2530,21 +2182,30 @@ void karte_t::set_tool( tool_t *tool_in, player_t *player )
 		return;
 	}
 	// check for password-protected players
-	if(  (!tool_in->is_init_network_safe()  ||  !tool_in->is_work_network_safe())  &&  needs_check  &&
+	if(  (!tool_in->is_init_keeps_game_state()  ||  !tool_in->is_work_keeps_game_state())  &&  needs_check  &&
 		 !(tool_in->get_id()==(TOOL_CHANGE_PLAYER|SIMPLE_TOOL)  ||  tool_in->get_id()==(TOOL_ADD_MESSAGE | GENERAL_TOOL))  &&
 		 player  &&  player->is_locked()  ) {
 		// player is currently password protected => request unlock first
 		create_win( -1, -1, new password_frame_t(player), w_info, magic_pwd_t + player->get_player_nr() );
 		return;
 	}
-	tool_in->flags |= event_get_last_control_shift();
-	if(!env_t::networkmode  ||  tool_in->is_init_network_safe()  ) {
-		local_set_tool(tool_in, player);
+	tool_in->flags |= (event_get_last_control_shift() ^ tool_t::control_invert);
+	if(!env_t::networkmode  ||  tool_in->is_local_execution()  ||  tool_in->is_init_keeps_game_state()  ) {
+		if (called_from_script  ||  tool_in->is_init_keeps_game_state()) {
+			local_set_tool(tool_in, player);
+		}
+		else {
+			// queue tool for execution
+			nwc_tool_t* nwc = new nwc_tool_t(player, tool_in, zeiger->get_pos(), 0, map_counter, true);
+			command_queue_append(nwc);
+			suspended = true;
+		}
 	}
 	else {
 		// queue tool for network
 		nwc_tool_t *nwc = new nwc_tool_t(player, tool_in, zeiger->get_pos(), steps, map_counter, true);
 		network_send_server(nwc);
+		suspended = true;
 	}
 }
 
@@ -2556,9 +2217,9 @@ void karte_t::local_set_tool( tool_t *tool_in, player_t * player )
 	// now call init
 	bool init_result = tool_in->init(player);
 	// for unsafe tools init() must return false
-	assert(tool_in->is_init_network_safe()  ||  !init_result);
+	assert(tool_in->is_init_keeps_game_state()  ||  !init_result);
 
-	if (player  && init_result  &&  !tool_in->is_scripted()) {
+	if (player  &&  init_result  &&  !tool_in->is_scripted()) {
 
 		set_dirty();
 		tool_t *sp_tool = selected_tool[player->get_player_nr()];
@@ -2594,55 +2255,6 @@ void karte_t::local_set_tool( tool_t *tool_in, player_t * player )
 	toolbar_last_used_t::last_used_tools->append( tool_in, player );
 }
 
-
-sint8 karte_t::min_hgt_nocheck(const koord k) const
-{
-	// more optimised version of min_hgt code
-	const sint8 * p = &grid_hgts[k.x + k.y*(sint32)(cached_grid_size.x+1)];
-
-	const int h1 = *p;
-	const int h2 = *(p+1);
-	const int h3 = *(p+get_size().x+2);
-	const int h4 = *(p+get_size().x+1);
-
-	return min(min(h1,h2), min(h3,h4));
-}
-
-
-sint8 karte_t::max_hgt_nocheck(const koord k) const
-{
-	// more optimised version of max_hgt code
-	const sint8 * p = &grid_hgts[k.x + k.y*(sint32)(cached_grid_size.x+1)];
-
-	const int h1 = *p;
-	const int h2 = *(p+1);
-	const int h3 = *(p+get_size().x+2);
-	const int h4 = *(p+get_size().x+1);
-
-	return max(max(h1,h2), max(h3,h4));
-}
-
-
-sint8 karte_t::min_hgt(const koord k) const
-{
-	const sint8 h1 = lookup_hgt(k);
-	const sint8 h2 = lookup_hgt(k+koord(1, 0));
-	const sint8 h3 = lookup_hgt(k+koord(1, 1));
-	const sint8 h4 = lookup_hgt(k+koord(0, 1));
-
-	return min(min(h1,h2), min(h3,h4));
-}
-
-
-sint8 karte_t::max_hgt(const koord k) const
-{
-	const sint8 h1 = lookup_hgt(k);
-	const sint8 h2 = lookup_hgt(k+koord(1, 0));
-	const sint8 h3 = lookup_hgt(k+koord(1, 1));
-	const sint8 h4 = lookup_hgt(k+koord(0, 1));
-
-	return max(max(h1,h2), max(h3,h4));
-}
 
 
 planquadrat_t *rotate90_new_plan;
@@ -2883,8 +2495,8 @@ bool karte_t::rem_fab(fabrik_t *fab)
 
 		// remove all links from factories
 		for(fabrik_t* const fab : fab_list) {
-			fab->rem_lieferziel(k);
-			fab->rem_supplier(k);
+			fab->remove_consumer(k);
+			fab->remove_supplier(k);
 		}
 
 		// remove all links to cities
@@ -3038,26 +2650,35 @@ void karte_t::sync_step(uint32 delta_t)
 	}
 	ticks += delta_t;
 
-	set_random_mode( INTERACTIVE_RANDOM );
-
 	/* animations do not require exact sync
-		* foundations etc are added removed frequently during city growth
-		* => they are now in a hastable!
-		*/
-	sync_eyecandy.sync_step( delta_t );
+	 * foundations etc are added removed frequently during city growth
+	 */
+	sync_buildings.sync_step(delta_t);
 
-	/* pedestrians do not require exact sync and are added/removed frequently
-		* => they are now in a hastable!
-		*/
-	sync_way_eyecandy.sync_step( delta_t );
+	wolke_t::sync_handler(delta_t);
 
-	clear_random_mode( INTERACTIVE_RANDOM );
+	pedestrian_t::sync_handler(delta_t);
+
+	// the following sync_steps affect the game state
+	sync_roadsigns.sync_step(delta_t);
+
+	movingobj_t::sync_handler(delta_t);
+
+	private_car_t::sync_handler(delta_t);
+
+	senke_t::sync_handler(delta_t);
 
 	sync.sync_step( delta_t );
 
 	ticker::update();
 
 	clear_random_mode( SYNC_STEP_RANDOM );
+
+	set_random_mode( INTERACTIVE_RANDOM );
+
+	eventmanager->check_events();
+
+	clear_random_mode( INTERACTIVE_RANDOM );
 }
 
 
@@ -3092,8 +2713,8 @@ void karte_t::display(uint32 delta_t)
 				grund_t *gr = lookup_kartenboden( new_pos.get_2d() );
 				bool redraw = false;
 				if( new_pos.z < gr->get_hoehe() ) {
-					redraw = grund_t::underground_mode == grund_t::ugm_none ? grund_t::underground_level != new_pos.z : true;
-					grund_t::set_underground_mode( env_t::follow_convoi_underground, new_pos.z );
+					redraw = (grund_t::underground_mode != grund_t::ugm_level)  ||  (grund_t::underground_level != new_pos.z);
+					grund_t::set_underground_mode( grund_t::ugm_level, new_pos.z );
 				}
 				else {
 					redraw = grund_t::underground_mode != grund_t::ugm_none;
@@ -3176,10 +2797,12 @@ void karte_t::update_frame_sleep_time()
 		// way too slow => try to increase time ...
 		if(  last_ms-last_interaction > 100  ) {
 			if(  last_ms-last_interaction > 500  ) {
+				idle_time >>= 1;
 				set_frame_time( 1+get_frame_time() );
 				// more than 1s since last zoom => check if zoom out is a way to improve it
-				if(  last_ms-last_interaction > 5000  &&  get_current_tile_raster_width() < 32  ) {
+				if(  last_ms-last_interaction > 5000  &&  get_current_tile_raster_width() < 32  &&  realFPS <= 80  ) {
 					zoom_factor_up();
+					viewport->metrics_updated();
 					set_dirty();
 					last_interaction = last_ms-1000;
 				}
@@ -3387,7 +3010,7 @@ DBG_MESSAGE("karte_t::new_year()","speedbonus for %d %i, %i, %i, %i, %i, %i, %i,
 
 	cbuffer_t buf;
 	buf.printf( translator::translate("Year %i has started."), last_year );
-	msg->add_message(buf,koord::invalid,message_t::general,color_idx_to_rgb(COL_BLACK),skinverwaltung_t::neujahrsymbol->get_image_id(0));
+	msg->add_message(buf,koord3d::invalid,message_t::general,SYSCOL_TEXT,skinverwaltung_t::neujahrsymbol->get_image_id(0));
 
 	for(convoihandle_t const cnv : convoi_array) {
 		cnv->new_year();
@@ -3456,14 +3079,14 @@ void karte_t::recalc_average_speed()
 				if(intro_month == current_month) {
 					cbuffer_t buf;
 					buf.printf( translator::translate("New %s now available:\n%s\n"), vehicle_type, translator::translate(info->get_name()) );
-					msg->add_message(buf,koord::invalid,message_t::new_vehicle,NEW_VEHICLE,info->get_base_image());
+					msg->add_message(buf,koord3d::invalid,message_t::new_vehicle,NEW_VEHICLE,info->get_base_image());
 				}
 
 				const uint16 retire_month = info->get_retire_year_month();
 				if(retire_month == current_month) {
 					cbuffer_t buf;
 					buf.printf( translator::translate("Production of %s has been stopped:\n%s\n"), vehicle_type, translator::translate(info->get_name()) );
-					msg->add_message(buf,koord::invalid,message_t::new_vehicle,NEW_VEHICLE,info->get_base_image());
+					msg->add_message(buf,koord3d::invalid,message_t::new_vehicle,NEW_VEHICLE,info->get_base_image());
 				}
 			}
 		}
@@ -3496,7 +3119,7 @@ sint32 karte_t::get_record_speed( waytype_t w ) const
 
 
 // sets the new speed record
-void karte_t::notify_record( convoihandle_t cnv, sint32 max_speed, koord k )
+void karte_t::notify_record( convoihandle_t cnv, sint32 max_speed, koord3d k )
 {
 	records->notify_record(cnv, max_speed, k, current_month);
 }
@@ -3553,7 +3176,7 @@ void karte_t::step()
 	}
 	else if(  step_mode==FAST_FORWARD  ) {
 		// fast forward first: get average simloops (i.e. calculate acceleration)
-		last_step_nr[steps%32] = dr_time();
+		last_step_nr[steps%32] = time;
 		int last_5_simloops = simloops;
 		if(  last_step_nr[(steps+32-5)%32] < last_step_nr[steps%32]  ) {
 			// since 5 steps=1s
@@ -3648,8 +3271,8 @@ void karte_t::step()
 	// step powerlines - required order: powernet, pumpe then senke
 	DBG_DEBUG4("karte_t::step", "step poweline stuff");
 	powernet_t::step_all(delta_t);
-	pumpe_t::step_all(delta_t);
-	senke_t::step_all(delta_t);
+	pumpe_t::sync_handler(delta_t);
+//	senke_t::step_all(delta_t); // not needed, handeld by sunc_step already
 
 	DBG_DEBUG4("karte_t::step", "step players");
 	// then step all players
@@ -3690,7 +3313,7 @@ void karte_t::step()
 		tool_t *tmp_tool = create_tool( TOOL_ADD_MESSAGE | GENERAL_TOOL );
 		tmp_tool->set_default_param( buf );
 		bool suspended;
-		call_work(tmp_tool, get_active_player(), koord3d::invalid, suspended);
+		call_work_api(tmp_tool, get_active_player(), koord3d::invalid, suspended, false);
 		// work is done (or command sent), it is safe to delete immediately
 		delete tmp_tool;
 	}
@@ -3873,205 +3496,6 @@ void karte_t::update_history()
 }
 
 
-static sint8 median( sint8 a, sint8 b, sint8 c )
-{
-#if 0
-	if(  a==b  ||  a==c  ) {
-		return a;
-	}
-	else if(  b==c  ) {
-		return b;
-	}
-	else {
-		// noting matches
-//		return (3*128+1 + a+b+c)/3-128;
-		return -128;
-	}
-#elif 0
-	if(  a<=b  ) {
-		return b<=c ? b : max(a,c);
-	}
-	else {
-		return b>c ? b : min(a,c);
-	}
-#else
-		return (6*128+3 + a+a+b+b+c+c)/6-128;
-#endif
-}
-
-
-slope_t::type karte_t::recalc_natural_slope( const koord k, sint8 &new_height ) const
-{
-	grund_t *gr = lookup_kartenboden(k);
-	if(!gr) {
-		return slope_t::flat;
-	}
-	else {
-		const sint8 max_hdiff = ground_desc_t::double_grounds ? 2 : 1;
-
-		sint8 corner_height[4];
-
-		// get neighbour corner heights
-		sint8 neighbour_height[8][4];
-		get_neighbour_heights( k, neighbour_height );
-
-		//check whether neighbours are foundations
-		bool neighbour_fundament[8];
-		for(  int i = 0;  i < 8;  i++  ) {
-			grund_t *gr2 = lookup_kartenboden( k + koord::neighbours[i] );
-			neighbour_fundament[i] = (gr2  &&  gr2->get_typ() == grund_t::fundament);
-		}
-
-		for(  uint8 i = 0;  i < 4;  i++  ) { // 0 = sw, 1 = se etc.
-			// corner_sw (i=0): tests vs neighbour 1:w (corner 2 j=1),2:sw (corner 3) and 3:s (corner 4)
-			// corner_se (i=1): tests vs neighbour 3:s (corner 3 j=2),4:se (corner 4) and 5:e (corner 1)
-			// corner_ne (i=2): tests vs neighbour 5:e (corner 4 j=3),6:ne (corner 1) and 7:n (corner 2)
-			// corner_nw (i=3): tests vs neighbour 7:n (corner 1 j=0),0:nw (corner 2) and 1:w (corner 3)
-
-			sint16 median_height = 0;
-			uint8 natural_corners = 0;
-			for(  int j = 1;  j < 4;  j++  ) {
-				if(  !neighbour_fundament[(i * 2 + j) & 7]  ) {
-					natural_corners++;
-					median_height += neighbour_height[(i * 2 + j) & 7][(i + j) & 3];
-				}
-			}
-			switch(  natural_corners  ) {
-				case 1: {
-					corner_height[i] = (sint8)median_height;
-					break;
-				}
-				case 2: {
-					corner_height[i] = median_height >> 1;
-					break;
-				}
-				default: {
-					// take the average of all 3 corners (if no natural corners just use the artificial ones anyway)
-					corner_height[i] = median( neighbour_height[(i * 2 + 1) & 7][(i + 1) & 3], neighbour_height[(i * 2 + 2) & 7][(i + 2) & 3], neighbour_height[(i * 2 + 3) & 7][(i + 3) & 3] );
-					break;
-				}
-			}
-		}
-
-		// new height of that tile ...
-		sint8 min_height = min( min( corner_height[0], corner_height[1] ), min( corner_height[2], corner_height[3] ) );
-		sint8 max_height = max( max( corner_height[0], corner_height[1] ), max( corner_height[2], corner_height[3] ) );
-		/* check for an artificial slope on a steep sidewall */
-		bool not_ok = abs( max_height - min_height ) > max_hdiff  ||  min_height == -128;
-
-		sint8 old_height = gr->get_hoehe();
-		new_height = min_height;
-
-		// now we must make clear, that there is no ground above/below the slope
-		if(  old_height!=new_height  ) {
-			not_ok |= lookup(koord3d(k,new_height))!=NULL;
-			if(  old_height > new_height  ) {
-				not_ok |= lookup(koord3d(k,old_height-1))!=NULL;
-			}
-			if(  old_height < new_height  ) {
-				not_ok |= lookup(koord3d(k,old_height+1))!=NULL;
-			}
-		}
-
-		if(  not_ok  ) {
-			/* difference too high or ground above/below
-			 * we just keep it as it was ...
-			 */
-			new_height = old_height;
-			return gr->get_grund_hang();
-		}
-
-		const sint16 d1 = min( corner_height[0] - new_height, max_hdiff );
-		const sint16 d2 = min( corner_height[1] - new_height, max_hdiff );
-		const sint16 d3 = min( corner_height[2] - new_height, max_hdiff );
-		const sint16 d4 = min( corner_height[3] - new_height, max_hdiff );
-		return encode_corners(d1, d2, d3, d4);
-	}
-}
-
-
-slope_t::type karte_t::calc_natural_slope( const koord k ) const
-{
-	if(!is_within_grid_limits(k.x, k.y)) {
-		return slope_t::flat;
-	}
-
-	const sint8 *p = &grid_hgts[k.x + k.y*(sint32)(get_size().x+1)];
-
-	const int h1 = *p;
-	const int h2 = *(p+1);
-	const int h3 = *(p+get_size().x+2);
-	const int h4 = *(p+get_size().x+1);
-
-	const int mini = min(min(h1,h2), min(h3,h4));
-
-	const int d1=h1-mini;
-	const int d2=h2-mini;
-	const int d3=h3-mini;
-	const int d4=h4-mini;
-
-	return encode_corners(d4, d3, d2, d1);
-}
-
-
-bool karte_t::is_water(koord k, koord dim) const
-{
-	koord k_check;
-	for(  k_check.x = k.x;  k_check.x < k.x + dim.x;  k_check.x++  ) {
-		for(  k_check.y = k.y;  k_check.y < k.y + dim.y;  k_check.y++  ) {
-			if(  !is_within_grid_limits( k_check + koord(1, 1) )  ||  max_hgt(k_check) > get_water_hgt(k_check)  ) {
-				return false;
-			}
-		}
-	}
-	return true;
-}
-
-
-bool karte_t::square_is_free(koord k, sint16 w, sint16 h, int *last_y, climate_bits cl) const
-{
-	if(k.x < 0  ||  k.y < 0  ||  k.x+w > get_size().x || k.y+h > get_size().y) {
-		return false;
-	}
-
-	grund_t *gr = lookup_kartenboden(k);
-	const sint16 platz_base_h = gr->get_hoehe(); // remember the base height of the first tile
-	const sint16 platz_max_h = gr->get_hoehe() + slope_t::max_diff( gr->get_grund_hang() ); // remember the max height of the first tile
-
-	koord k_check;
-	for(k_check.y=k.y+h-1; k_check.y>=k.y; k_check.y--) {
-		for(k_check.x=k.x; k_check.x<k.x+w; k_check.x++) {
-			const grund_t *gr = lookup_kartenboden(k_check);
-
-			// we can built, if: max height all the same, everything removable and no buildings there
-			slope_t::type slope = gr->get_grund_hang();
-			sint8 max_height = gr->get_hoehe() + slope_t::max_diff(slope);
-			climate test_climate = get_climate(k_check);
-			if(  cl & (1 << water_climate)  &&  test_climate != water_climate  ) {
-				bool neighbour_water = false;
-				for(int i=0; i<8  &&  !neighbour_water; i++) {
-					if(  is_within_limits(k_check + koord::neighbours[i])  &&  get_climate( k_check + koord::neighbours[i] ) == water_climate  ) {
-						neighbour_water = true;
-					}
-				}
-				if(  neighbour_water  ) {
-					test_climate = water_climate;
-				}
-			}
-			if( (platz_max_h != max_height  &&  platz_base_h != gr->get_hoehe())  ||  !gr->ist_natur()  ||  gr->kann_alle_obj_entfernen(NULL) != NULL  ||
-			     (cl & (1 << test_climate)) == 0  ||  ( slope && (lookup( gr->get_pos()+koord3d(0,0,1) ) ||
-			     (slope_t::max_diff(slope)==2 && lookup( gr->get_pos()+koord3d(0,0,2) )) ))  ) {
-				if(  last_y  ) {
-					*last_y = k_check.y;
-				}
-				return false;
-			}
-		}
-	}
-	return true;
-}
-
-
 slist_tpl<koord> *karte_t::find_squares(sint16 w, sint16 h, climate_bits cl, sint16 old_x, sint16 old_y) const
 {
 	slist_tpl<koord> * list = new slist_tpl<koord>();
@@ -4129,7 +3553,7 @@ void karte_t::save(const char *filename, bool autosave, const char *version_str,
 	const loadsave_t::mode_t mode = autosave ? loadsave_t::autosave_mode : loadsave_t::save_mode;
 	const int save_level = autosave ? loadsave_t::autosave_level : loadsave_t::save_level;
 
-	if(  file.wr_open( savename.c_str(), mode, save_level, env_t::objfilename.c_str(), version_str ) != loadsave_t::FILE_STATUS_OK  ) {
+	if(  file.wr_open( savename.c_str(), mode, save_level, env_t::pak_name.c_str(), version_str ) != loadsave_t::FILE_STATUS_OK  ) {
 		create_win(new news_img("Kann Spielstand\nnicht speichern.\n"), w_info, magic_none);
 		dbg->error("karte_t::save", "Cannot open file '%s' for writing! Check permissions!", savename.c_str());
 	}
@@ -4293,16 +3717,6 @@ DBG_MESSAGE("karte_t::save(loadsave_t *file)", "motd filename %s", env_t::server
 }
 
 
-// store missing obj during load and their severity
-void karte_t::add_missing_paks( const char *name, missing_level_t level )
-{
-	if(  missing_pak_names.get( name )==NOT_MISSING  ) {
-		missing_pak_names.put( strdup(name), level );
-	}
-}
-
-
-
 void karte_t::switch_server( bool start_server, bool port_forwarding )
 {
 	if(  !start_server  ) {
@@ -4384,7 +3798,7 @@ bool karte_t::load(const char *filename)
 	loadsave_t file;
 
 	// clear hash table with missing paks (may cause some small memory loss though)
-	missing_pak_names.clear();
+	pakset_manager_t::clear_missing_paks();
 
 	dbg->message("karte_t::load", "Loading game from '%s'", filename);
 
@@ -4468,18 +3882,17 @@ bool karte_t::load(const char *filename)
 		file.set_buffered(true);
 		load(&file);
 
-		if(  env_t::networkmode  ) {
-			clear_command_queue();
-		}
-
 		if(  env_t::server  ) {
+			// since the sync should have been the last command on the clients due to tcp, only clear command queue on the server
+			clear_command_queue();
+
 			step_mode = FIX_RATIO;
-			if(  env_t::server  ) {
-				// meaningless to use a locked map; there are passwords now
-				settings.set_allow_player_change(true);
-				// language of map becomes server language
-				settings.set_name_language_iso(translator::get_lang()->iso_base);
-			}
+
+			// meaningless to use a locked map; there are passwords now
+			settings.set_allow_player_change(true);
+
+			// language of map becomes server language
+			settings.set_name_language_iso(translator::get_lang()->iso_base);
 
 			if(  server_reload_pwd_hashes  ) {
 				char fn[256];
@@ -4520,54 +3933,8 @@ bool karte_t::load(const char *filename)
 		}
 		else if(  !env_t::networkmode  ||  !env_t::restore_UI  ) {
 			// warning message about missing paks
-			if(  !missing_pak_names.empty()  ) {
+			pakset_manager_t::warn_if_paks_missing();
 
-				cbuffer_t msg;
-				msg.append("<title>");
-				msg.append(translator::translate("Missing pakfiles"));
-				msg.append("</title>\n");
-
-				cbuffer_t error_paks;
-				cbuffer_t warning_paks;
-
-				cbuffer_t paklog;
-				paklog.append( "\n" );
-				for(auto const& i : missing_pak_names) {
-					if (i.value <= MISSING_ERROR) {
-						error_paks.append(translator::translate(i.key));
-						error_paks.append("<br>\n");
-						paklog.append( i.key );
-						paklog.append("\n" );
-					}
-					else {
-						warning_paks.append(translator::translate(i.key));
-						warning_paks.append("<br>\n");
-					}
-				}
-
-				if(  error_paks.len()>0  ) {
-					msg.append("<h1>");
-					msg.append(translator::translate("Pak which may cause severe errors:"));
-					msg.append("</h1><br>\n");
-					msg.append("<br>\n");
-					msg.append( error_paks );
-					msg.append("<br>\n");
-					dbg->warning( "The following paks are missing and may cause errors", paklog );
-				}
-
-				if(  warning_paks.len()>0  ) {
-					msg.append("<h1>");
-					msg.append(translator::translate("Pak which may cause visual errors:"));
-					msg.append("</h1><br>\n");
-					msg.append("<br>\n");
-					msg.append( warning_paks );
-					msg.append("<br>\n");
-				}
-
-				help_frame_t *win = new help_frame_t();
-				win->set_text( msg );
-				create_win(win, w_info, magic_pakset_info_t);
-			}
 			// will not notify if we restore everything
 			if(  scenario->is_scripted()  ) {
 				scenario->open_info_win();
@@ -4901,7 +4268,6 @@ void karte_t::rdwr_gamestate(loadsave_t *file, loadingscreen_t *ls)
 	if (file->is_loading()) {
 		// zum laden vorbereiten -> tabelle loeschen
 		powernet_t::new_world();
-		pumpe_t::new_world();
 		senke_t::new_world();
 		script_api::new_world();
 
@@ -4961,8 +4327,8 @@ void karte_t::rdwr_gamestate(loadsave_t *file, loadingscreen_t *ls)
 			goods_manager_t::set_multiplier( 1000 );
 		}
 
-		world_maximum_height = settings.get_maximumheight();
-		world_minimum_height = settings.get_minimumheight();
+		max_allowed_height = settings.get_maximumheight();
+		min_allowed_height = settings.get_minimumheight();
 
 		groundwater = (sint8)(settings.get_groundwater());
 		min_height = max_height = groundwater;
@@ -5151,7 +4517,7 @@ void karte_t::rdwr_gamestate(loadsave_t *file, loadingscreen_t *ls)
 					sint32 hgt;
 					file->rdwr_long(hgt);
 					// old height step was 16!
-					set_grid_hgt(x, y, hgt/16 );
+					set_grid_hgt_nocheck(x, y, hgt/16 );
 				}
 			}
 		}
@@ -5419,6 +4785,100 @@ void karte_t::update_map_intern(sint16 x_min, sint16 x_max, sint16 y_min, sint16
 }
 
 
+bool karte_t::can_flood_to_depth(koord k, sint8 new_water_height, sint8 *stage, sint8 *our_stage, sint16 x_min, sint16 x_max, sint16 y_min, sint16 y_max  ) const
+{
+	bool succeeded = true;
+	if(  k == koord::invalid  ) {
+		return false;
+	}
+
+	if(  new_water_height < get_groundwater() - 3  ) {
+		return false;
+	}
+
+	// make a list of tiles to change
+	// cannot use a recursive method as stack is not large enough!
+
+	sint8 *from_dir = new sint8[get_size().x * get_size().y];
+	bool local_stage = (our_stage==NULL);
+
+	if(  local_stage  ) {
+		our_stage = new sint8[get_size().x * get_size().y];
+	}
+
+	memset( our_stage + sizeof(sint8) * array_koord(0,y_min), -1, sizeof(sint8) * get_size().x * (y_max-y_min) );
+
+	uint32 offset = array_koord(k.x,k.y);
+	from_dir[offset]=-1;
+	stage[offset]=0;
+	our_stage[offset]=0;
+
+	do {
+		koord k_neighbour = k + koord::neighbours[our_stage[offset]];
+		if(  k_neighbour.x < x_min  ||  k_neighbour.x>=x_max) {
+			succeeded = false;
+		} else if(  k_neighbour.y >= y_min  &&  k_neighbour.y<y_max  ) {
+			const uint32 neighbour_offset = array_koord(k_neighbour.x,k_neighbour.y);
+
+			// already visited
+			if(our_stage[neighbour_offset] != -1) {
+				goto next_neighbour;
+			}
+
+			// land or water height above
+			if(max_water_hgt[neighbour_offset] >= new_water_height) {
+				goto next_neighbour;
+			}
+
+			//move on to next tile
+			from_dir[neighbour_offset] = our_stage[offset];
+			stage[neighbour_offset] = 0;
+			our_stage[neighbour_offset] = 0;
+			k = k_neighbour;
+			offset = neighbour_offset;
+			continue;
+		}
+		else if(  succeeded  &&  (global_lake_fill  ||  k_neighbour.y < 1  ||  k_neighbour.y>=get_size().y-1)  ) {
+			// edge of map - we keep iterating so we can mark all connected tiles as failing
+			succeeded = false;
+		}
+		next_neighbour:
+		//return back to previous tile
+		while(  our_stage[offset]==7  ) {
+			if(  from_dir[offset] == -1  ) goto exit_iteration;    // for natural maps only need to have checked one path out from original tile
+			k = k - koord::neighbours[from_dir[offset]];
+			offset = array_koord(k.x,k.y);
+		}
+		our_stage[offset]++;
+	} while(  true  );
+
+	exit_iteration:
+
+	delete [] from_dir;
+
+	if(  local_stage  ) {
+		delete [] our_stage;
+	}
+
+	return succeeded;
+}
+
+
+void karte_t::flood_to_depth( sint8 new_water_height, sint8 *stage )
+{
+	const uint16 size_x = get_size().x;
+	const uint16 size_y = get_size().y;
+
+	uint32 offset_max = size_x*size_y;
+	for(  uint32 offset = 0;  offset < offset_max;  offset++  ) {
+		if(  stage[offset] == -1  ) {
+			continue;
+		}
+		water_hgts[offset] = new_water_height;
+	}
+}
+
+
 // recalcs all ground tiles on the map
 void karte_t::update_map()
 {
@@ -5434,6 +4894,7 @@ void karte_t::update_underground()
 	get_view()->clear_prepared();
 	world_view_t::invalidate_all();
 	set_dirty();
+	minimap_t::get_instance()->calc_map();
 }
 
 void karte_t::prepare_tiles(rect_t const &new_area, rect_t const &old_area) {
@@ -5470,57 +4931,6 @@ void karte_t::prepare_tiles(rect_t const &new_area, rect_t const &old_area) {
 				const planquadrat_t &tile = plan[y * cached_grid_size.x + x];
 				tile.update_underground();
 			}
-		}
-	}
-}
-
-void karte_t::calc_climate(koord k, bool recalc)
-{
-	planquadrat_t *pl = access(k);
-	if(  !pl  ) {
-		return;
-	}
-
-	if( (unsigned)k.x >= climate_map.get_width()  ||  (unsigned)k.y >= climate_map.get_height()  ) {
-		// not initialised yet (may happend during river creation)
-		return;
-	}
-
-	grund_t *gr = pl->get_kartenboden();
-	if(  gr  ) {
-		if(  !gr->is_water()  ) {
-			bool beach = false;
-			climate default_cl = (climate)climate_map.at( k.x, k.y );
-			if(  gr->get_pos().z == groundwater  ) {
-				for(  int i = 0;  i < 8 && !beach;  i++  ) {
-					grund_t *gr2 = lookup_kartenboden( k + koord::neighbours[i] );
-					if(  gr2 && gr2->is_water()  ) {
-						beach = true;
-					}
-				}
-			}
-			if( beach ) {
-				pl->set_climate( desert_climate );
-			}
-			else if(  default_cl>water_climate  &&  default_cl<=arctic_climate  &&  settings.get_climate_borders(default_cl,false)<=gr->get_pos().z  &&  settings.get_climate_borders(default_cl,true)>gr->get_pos().z  ) {
-				// if possible keep (or revert) to original climate
-				pl->set_climate( default_cl );
-			}
-			else {
-				pl->set_climate( get_climate_at_height( max( gr->get_pos().z, groundwater + 1 ) ) );
-			}
-		}
-		else {
-			pl->set_climate( water_climate );
-		}
-		pl->set_climate_transition_flag(false);
-		pl->set_climate_corners(0);
-	}
-
-	if(  recalc  ) {
-		recalc_transitions(k);
-		for(  int i = 0;  i < 8;  i++  ) {
-			recalc_transitions( k + koord::neighbours[i] );
 		}
 	}
 }
@@ -5865,113 +5275,6 @@ void karte_t::assign_climate_map_region( sint16 xtop, sint16 ytop, sint16 xbotto
 }
 
 
-void karte_t::get_height_slope_from_grid(koord k, sint8 &hgt, slope_t::type &slope)
-{
-	if(  (k.x | k.y | (cached_grid_size.x - k.x-1) | (cached_grid_size.y - k.y-1)) >= 0  ) {
-		// inside map, so without further checks
-		const sint8 h_n = lookup_hgt_nocheck(k.x, k.y);
-		const sint8 h_w = lookup_hgt_nocheck(k.x, k.y+1);
-		const sint8 h_s = lookup_hgt_nocheck(k.x+1, k.y+1);
-		const sint8 h_e = lookup_hgt_nocheck(k.x+1, k.y);
-
-		hgt = min(min(h_n, h_e), min(h_s, h_w));
-
-		slope  = slope_t::northwest * min(h_n - hgt, 2);
-		slope |= slope_t::northeast * min(h_e - hgt, 2);
-		slope |= slope_t::southeast * min(h_s - hgt, 2);
-		slope |= slope_t::southwest * min(h_w - hgt, 2);
-	}
-}
-
-
-// fills array with neighbour heights
-void karte_t::get_neighbour_heights(const koord k, sint8 neighbour_height[8][4]) const
-{
-	for(  int i = 0;  i < 8;  i++  ) { // 0 = nw, 1 = w etc.
-		planquadrat_t *pl2 = access( k + koord::neighbours[i] );
-		if(  pl2  ) {
-			grund_t *gr2 = pl2->get_kartenboden();
-			slope_t::type slope_corner = gr2->get_grund_hang();
-			for(  int j = 0;  j < 4;  j++  ) {
-				neighbour_height[i][j] = gr2->get_hoehe() + corner_sw(slope_corner);
-				slope_corner /= slope_t::southeast;
-			}
-		}
-		else {
-			switch(i) {
-				case 0: // nw
-					neighbour_height[i][0] = groundwater;
-					neighbour_height[i][1] = max( lookup_hgt( k+koord(0,0) ), get_water_hgt( k ) );
-					neighbour_height[i][2] = groundwater;
-					neighbour_height[i][3] = groundwater;
-				break;
-				case 1: // w
-					neighbour_height[i][0] = groundwater;
-					neighbour_height[i][1] = max( lookup_hgt( k+koord(0,1) ), get_water_hgt( k ) );
-					neighbour_height[i][2] = max( lookup_hgt( k+koord(0,0) ), get_water_hgt( k ) );
-					neighbour_height[i][3] = groundwater;
-				break;
-				case 2: // sw
-					neighbour_height[i][0] = groundwater;
-					neighbour_height[i][1] = groundwater;
-					neighbour_height[i][2] = max( lookup_hgt( k+koord(0,1) ), get_water_hgt( k ) );
-					neighbour_height[i][3] = groundwater;
-				break;
-				case 3: // s
-					neighbour_height[i][0] = groundwater;
-					neighbour_height[i][1] = groundwater;
-					neighbour_height[i][2] = max( lookup_hgt( k+koord(1,1) ), get_water_hgt( k ) );
-					neighbour_height[i][3] = max( lookup_hgt( k+koord(0,1) ), get_water_hgt( k ) );
-				break;
-				case 4: // se
-					neighbour_height[i][0] = groundwater;
-					neighbour_height[i][1] = groundwater;
-					neighbour_height[i][2] = groundwater;
-					neighbour_height[i][3] = max( lookup_hgt( k+koord(1,1) ), get_water_hgt( k ) );
-				break;
-				case 5: // e
-					neighbour_height[i][0] = max( lookup_hgt( k+koord(1,1) ), get_water_hgt( k ) );
-					neighbour_height[i][1] = groundwater;
-					neighbour_height[i][2] = groundwater;
-					neighbour_height[i][3] = max( lookup_hgt( k+koord(1,0) ), get_water_hgt( k ) );
-				break;
-				case 6: // ne
-					neighbour_height[i][0] = max( lookup_hgt( k+koord(1,0) ), get_water_hgt( k ) );
-					neighbour_height[i][1] = groundwater;
-					neighbour_height[i][2] = groundwater;
-					neighbour_height[i][3] = groundwater;
-				break;
-				case 7: // n
-					neighbour_height[i][0] = max( lookup_hgt( k+koord(0,0) ), get_water_hgt( k ) );
-					neighbour_height[i][1] = max( lookup_hgt( k+koord(1,0) ), get_water_hgt( k ) );
-					neighbour_height[i][2] = groundwater;
-					neighbour_height[i][3] = groundwater;
-				break;
-			}
-
-			/*neighbour_height[i][0] = groundwater;
-			neighbour_height[i][1] = groundwater;
-			neighbour_height[i][2] = groundwater;
-			neighbour_height[i][3] = groundwater;*/
-		}
-	}
-}
-
-
-void karte_t::rotate_transitions(koord k)
-{
-	planquadrat_t *pl = access(k);
-	if(  !pl  ) {
-		return;
-	}
-
-	uint8 climate_corners = pl->get_climate_corners();
-	if(  climate_corners != 0  ) {
-		climate_corners = (climate_corners >> 1) | ((climate_corners & 1) << 3);
-		pl->set_climate_corners( climate_corners );
-	}
-}
-
 
 void karte_t::recalc_transitions_loop( sint16 x_min, sint16 x_max, sint16 y_min, sint16 y_max )
 {
@@ -5980,63 +5283,6 @@ void karte_t::recalc_transitions_loop( sint16 x_min, sint16 x_max, sint16 y_min,
 			recalc_transitions( koord( x, y ) );
 		}
 	}
-}
-
-
-void karte_t::recalc_transitions(koord k)
-{
-	planquadrat_t *pl = access(k);
-	if(  !pl  ) {
-		return;
-	}
-
-	grund_t *gr = pl->get_kartenboden();
-	if(  !gr->is_water()  ) {
-		// get neighbour corner heights
-		sint8 neighbour_height[8][4];
-		get_neighbour_heights( k, neighbour_height );
-
-		// look up neighbouring climates
-		climate neighbour_climate[8];
-		for(  int i = 0;  i < 8;  i++  ) { // 0 = nw, 1 = w etc.
-			koord k_neighbour = k + koord::neighbours[i];
-			if(  !is_within_limits(k_neighbour)  ) {
-				k_neighbour = get_closest_coordinate(k_neighbour);
-			}
-			neighbour_climate[i] = get_climate( k_neighbour );
-		}
-
-		uint8 climate_corners = 0;
-		climate climate0 = get_climate(k);
-
-		slope_t::type slope_corner = gr->get_grund_hang();
-		for(  uint8 i = 0;  i < 4;  i++  ) { // 0 = sw, 1 = se etc.
-			// corner_sw (i=0): tests vs neighbour 1:w (corner 2 j=1),2:sw (corner 3) and 3:s (corner 4)
-			// corner_se (i=1): tests vs neighbour 3:s (corner 3 j=2),4:se (corner 4) and 5:e (corner 1)
-			// corner_ne (i=2): tests vs neighbour 5:e (corner 4 j=3),6:ne (corner 1) and 7:n (corner 2)
-			// corner_nw (i=3): tests vs neighbour 7:n (corner 1 j=0),0:nw (corner 2) and 1:w (corner 3)
-			sint8 corner_height = gr->get_hoehe() + corner_sw(slope_corner);
-
-			climate transition_climate = water_climate;
-			climate min_climate = arctic_climate;
-
-			for(  int j = 1;  j < 4;  j++  ) {
-				if(  corner_height == neighbour_height[(i * 2 + j) & 7][(i + j) & 3]) {
-					climate climatej = neighbour_climate[(i * 2 + j) & 7];
-					climatej > transition_climate ? transition_climate = climatej : 0;
-					climatej < min_climate ? min_climate = climatej : 0;
-				}
-			}
-
-			if(  min_climate == water_climate  ||  transition_climate > climate0  ) {
-				climate_corners |= 1 << i;
-			}
-			slope_corner /= slope_t::southeast;
-		}
-		pl->set_climate_transition_flag( climate_corners != 0 );
-		pl->set_climate_corners( climate_corners );
-	}
-	gr->calc_image();
 }
 
 
@@ -6264,15 +5510,6 @@ void karte_t::set_fast_forward(bool ff)
 }
 
 
-koord karte_t::get_closest_coordinate(koord outside_pos)
-{
-	outside_pos.clip_min(koord(0,0));
-	outside_pos.clip_max(koord(get_size().x-1,get_size().y-1));
-
-	return outside_pos;
-}
-
-
 /* creates a new player with this type */
 const char *karte_t::init_new_player(uint8 new_player_in, uint8 type)
 {
@@ -6348,7 +5585,7 @@ void karte_t::switch_active_player(uint8 new_player, bool silent)
 			// tell the player
 			cbuffer_t buf;
 			buf.printf( translator::translate("Now active as %s.\n"), get_active_player()->get_name() );
-			msg->add_message(buf, koord::invalid, message_t::ai | message_t::do_not_rdwr_flag, PLAYER_FLAG|get_active_player()->get_player_nr(), IMG_EMPTY);
+			msg->add_message(buf, koord3d::invalid, message_t::ai | message_t::do_not_rdwr_flag, PLAYER_FLAG|get_active_player()->get_player_nr(), IMG_EMPTY);
 		}
 
 		// update menu entries
@@ -6418,7 +5655,7 @@ void karte_t::stop(bool exit_game)
 
 			// construct from pak name an autosave if requested
 			std::string pak_name("autosave-");
-			pak_name.append(env_t::objfilename);
+			pak_name.append(env_t::pak_name);
 			pak_name.erase(pak_name.length() - 1);
 			pak_name.append(".sve");
 
@@ -6465,10 +5702,12 @@ void karte_t::network_game_set_pause(bool pause_, uint32 syncsteps_)
 }
 
 
-const char* karte_t::call_work(tool_t *tool, player_t *player, koord3d pos, bool &suspended)
+const char* karte_t::call_work_api(tool_t *tool, player_t *player, koord3d pos, bool &suspended, bool called_from_api )
 {
+	suspended = false;
 	const char *err = NULL;
-	if (!env_t::networkmode  ||  tool->is_work_network_safe()  ||  tool->is_work_here_network_safe( player, pos) ) {
+	bool network_safe_tool = tool->is_work_keeps_game_state() || tool->is_work_here_keeps_game_state(player, pos);
+	if(  !env_t::networkmode  ||  network_safe_tool  ) {
 		// do the work
 		tool->flags |= tool_t::WFL_LOCAL;
 		// check allowance by scenario
@@ -6481,9 +5720,19 @@ const char* karte_t::call_work(tool_t *tool, player_t *player, koord3d pos, bool
 			}
 		}
 		if (err == NULL) {
-			err = tool->work(player, pos);
+			if (called_from_api  ||  network_safe_tool) {
+				err = tool->work(player, pos);
+				suspended = false;
+			}
+			else {
+				// queue tool for execution (will be only done when NOT in networkmode!)
+				nwc_tool_t* nwc = new nwc_tool_t(player, tool, pos, get_steps(), get_map_counter(), false);
+				command_queue_append(nwc);
+				// reset tool
+				tool->init(player);
+				suspended = true;
+			}
 		}
-		suspended = false;
 	}
 	else {
 		// queue tool for network
@@ -6498,6 +5747,14 @@ const char* karte_t::call_work(tool_t *tool, player_t *player, koord3d pos, bool
 
 
 static slist_tpl<network_world_command_t*> command_queue;
+static koord3d next_deferred_move_to = koord3d::invalid;
+static uint8   next_deferred_move_flags = 0;
+
+void karte_t::set_deferred_move_to(koord3d k, uint8 f)
+{
+	next_deferred_move_to = k;
+	next_deferred_move_flags = f;
+}
 
 void karte_t::command_queue_append(network_world_command_t* nwc) const
 {
@@ -6649,7 +5906,7 @@ void karte_t::process_network_commands(sint32 *ms_difference)
 void karte_t::do_network_world_command(network_world_command_t *nwc)
 {
 	// want to execute something in the past?
-	if (nwc->get_sync_step() < sync_steps) {
+	if (nwc->get_sync_step()!=0  &&  nwc->get_sync_step() < sync_steps) {
 		if (!nwc->ignore_old_events()) {
 			dbg->warning("karte_t:::do_network_world_command", "wanted to do_command(%s) in the past", nwc->get_name());
 			network_disconnect();
@@ -6710,22 +5967,31 @@ uint32 karte_t::get_next_command_step()
 sint16 karte_t::get_sound_id(grund_t *gr)
 {
 	if(  gr->ist_natur()  ||  gr->is_water()  ) {
-		sint16 id = NO_SOUND;
+
+		// first, find out if climates overlap for shore
+		const koord k = gr->get_pos().get_2d();
+		uint8 climate_corners = access(k)->get_climate_corners();
+		if (climate_corners  && sound_desc_t::beach_sound!=NO_SOUND) {
+			for (int i = 0; i < 8; i++) {
+				koord k_neighbour = k + koord::neighbours[i];
+				if (!is_within_limits(k_neighbour)) {
+					k_neighbour = get_closest_coordinate(k_neighbour);
+				}
+				if(water_climate == get_climate(k_neighbour)) {
+					// one croner water => shore
+					return sound_desc_t::beach_sound;
+				}
+			}
+		}
+		// try forest
+		if (  sound_desc_t::forest_sound!=NO_SOUND  &&  gr->get_top() > 0  &&  gr->obj_bei(0)->get_typ() == obj_t::baum  ) {
+			return sound_desc_t::forest_sound;
+		}
 		if(  gr->get_pos().z >= get_snowline()  ) {
-			id = sound_desc_t::climate_sounds[ arctic_climate ];
+			return sound_desc_t::climate_sounds[ arctic_climate ];
 		}
 		else {
-			id = sound_desc_t::climate_sounds[get_climate( zeiger->get_pos().get_2d() )];
-		}
-		if (id != NO_SOUND) {
-			return id;
-		}
-		// try, if there is another sound ready
-		if(  zeiger->get_pos().z==groundwater  &&  !gr->is_water()  ) {
-			return sound_desc_t::beach_sound;
-		}
-		else if(  gr->get_top()>0  &&  gr->obj_bei(0)->get_typ()==obj_t::baum  ) {
-			return sound_desc_t::forest_sound;
+			return sound_desc_t::climate_sounds[get_climate( k )];
 		}
 	}
 	return NO_SOUND;
@@ -6741,8 +6007,9 @@ static void heavy_rotate_saves(const char *prefix, uint32 sync_steps, uint32 num
 	world()->save(name, false, SERVER_SAVEGAME_VER_NR, true);
 
 	if (sync_steps >= num_to_keep) {
-		name.printf(SAVE_PATH_X "heavy/heavy-%s-%04d.sve", prefix, sync_steps - num_to_keep);
-		dr_remove(name);
+		cbuffer_t old_name;
+		old_name.printf(SAVE_PATH_X "heavy/heavy-%s-%04d.sve", prefix, sync_steps - num_to_keep);
+		dr_remove(old_name);
 	}
 }
 
@@ -6752,6 +6019,7 @@ bool karte_t::interactive(uint32 quit_month)
 	finish_loop = false;
 	sync_steps = 0;
 	sync_steps_barrier = sync_steps;
+	next_deferred_move_to = koord3d::invalid;
 
 	network_frame_count = 0;
 	vector_tpl<uint16>hashes_ok; // bit set: this client can do something with this player
@@ -6771,6 +6039,7 @@ bool karte_t::interactive(uint32 quit_month)
 	sint32 ms_difference = 0;
 	reset_timer();
 	DBG_DEBUG4("karte_t::interactive", "welcome in this routine");
+	uint32 interactive_start_timer = dr_time(); (void)interactive_start_timer;
 
 	if(  env_t::server  ) {
 		step_mode |= FIX_RATIO;
@@ -6808,11 +6077,30 @@ bool karte_t::interactive(uint32 quit_month)
 			DBG_DEBUG4("karte_t::interactive", "end of sound");
 		}
 
-		// check events queued since our last iteration
-		eventmanager->check_events();
-
+		// events are now checked during each screen update for quicker feedback on scrolling etc.
 		if (env_t::quit_simutrans){
 			break;
+		}
+
+		if (next_deferred_move_to != koord3d::invalid) {
+			// some tool movement is expensive (like route search) and must be done outsied sync_step
+			// to avoid calling a the non-reentrant route search twice
+			tool_t *tool = selected_tool[active_player_nr];
+			const char* err = scenario->is_work_allowed_here(active_player, tool->get_id(), tool->get_waytype(), next_deferred_move_to);
+			if (err == NULL) {
+				koord3d target = next_deferred_move_to;
+				next_deferred_move_to = koord3d::invalid;
+				tool->flags = next_deferred_move_flags;
+				tool->move(active_player, true, target);
+				tool->flags = 0;
+				next_deferred_move_flags = 0;
+			}
+			else if (two_click_tool_t *tct = dynamic_cast<two_click_tool_t*>(tool)) {
+				// remove preview images
+				if (!tct->is_first_click()) {
+					tct->cleanup(false);
+				}
+			}
 		}
 
 		if(  env_t::networkmode  ) {
@@ -6825,11 +6113,21 @@ bool karte_t::interactive(uint32 quit_month)
 			DBG_DEBUG4("karte_t::interactive", "can I get some sleep?");
 			INT_CHECK( "karte_t::interactive()" );
 			const sint32 wait_time = (sint32)next_step_time - (sint32)dr_time();
-			if(wait_time>0) {
-				dr_sleep(min(wait_time, 3));
-				INT_CHECK( "karte_t::interactive()" );
+			if(wait_time>2) {
+				dr_sleep(2);
+				INT_CHECK("karte_t::interactive()");
 			}
 			DBG_DEBUG4("karte_t::interactive", "end of sleep");
+
+			// process enqueued network world commands
+			while (!command_queue.empty()) {
+				network_world_command_t* nwc = command_queue.remove_first();
+				if (nwc) {
+					nwc->do_command(this);
+					delete nwc;
+				}
+			}
+			INT_CHECK("karte_t::interactive()");
 		}
 
 		uint32 time = dr_time();
@@ -6847,6 +6145,7 @@ bool karte_t::interactive(uint32 quit_month)
 				// only update display
 				display(0);
 				idle_time = 100;
+				eventmanager->check_events();
 			}
 			else if(  env_t::networkmode  &&  !env_t::server  &&  sync_steps >= sync_steps_barrier  ) {
 				display(0);
@@ -6880,7 +6179,6 @@ bool karte_t::interactive(uint32 quit_month)
 					display( delta_t );
 
 					if (++network_frame_count == settings.get_frames_per_step()) {
-						// ever fourth frame
 						set_random_mode( STEP_RANDOM );
 						step();
 						clear_random_mode( STEP_RANDOM );
@@ -6933,11 +6231,20 @@ bool karte_t::interactive(uint32 quit_month)
 					}
 				}
 				else {
+					// normal ratio
 					INT_CHECK( "karte_t::interactive()" );
 					set_random_mode( STEP_RANDOM );
 					step();
 					clear_random_mode( STEP_RANDOM );
-					idle_time = ((idle_time*7) + next_step_time - dr_time())/8;
+					uint32 cur_time = dr_time();
+					if (next_step_time > cur_time) {
+						// slowly change idel time
+						idle_time = ( (idle_time * 7) + (next_step_time - cur_time) ) / 8;
+					}
+					else {
+						// but half if we are really far behind
+						idle_time >>= 1;
+					}
 					INT_CHECK( "karte_t::interactive()" );
 				}
 			}
@@ -6951,6 +6258,8 @@ bool karte_t::interactive(uint32 quit_month)
 
 		DBG_DEBUG4("karte_t::interactive", "point of loop return");
 	} while(!finish_loop  &&  get_current_month()<quit_month);
+
+	DBG_MESSAGE("karte_t::interactive()", "Spent %lu ms in loop", dr_time() - interactive_start_timer);
 
 	if(  get_current_month() >= quit_month  ) {
 		env_t::quit_simutrans = true;
@@ -7037,7 +6346,7 @@ void karte_t::announce_server(server_announce_type_t status)
 		}
 		else {
 			// construct from pak name
-			std::string pak_name = env_t::objfilename;
+			std::string pak_name = env_t::pak_name;
 			pak_name.erase( pak_name.length() - 1 );
 			encode_URI( buf, pak_name.c_str() );
 		}
@@ -7102,7 +6411,7 @@ void karte_t::network_disconnect()
 	reset_timer();
 	clear_command_queue();
 	create_win( display_get_width()/2-128, 40, new news_img("Lost synchronisation\nwith server."), w_info, magic_none);
-	ticker::add_msg( translator::translate("Lost synchronisation\nwith server."), koord::invalid, color_idx_to_rgb(COL_BLACK) );
+	ticker::add_msg( translator::translate("Lost synchronisation\nwith server."), koord3d::invalid, SYSCOL_TEXT );
 	last_active_player_nr = active_player_nr;
 
 	stop(false);

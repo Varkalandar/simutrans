@@ -3,8 +3,8 @@
  * (see LICENSE.txt)
  */
 
-#ifndef SIMMENU_H
-#define SIMMENU_H
+#ifndef TOOL_SIMMENU_H
+#define TOOL_SIMMENU_H
 
 
 #include <string>
@@ -78,6 +78,7 @@ enum {
 	TOOL_EXEC_TWO_CLICK_SCRIPT,
 	TOOL_PLANT_GROUNDOBJ,
 	TOOL_ADD_MESSAGE,
+	TOOL_REMOVE_SIGNAL,
 	GENERAL_TOOL_COUNT,
 	GENERAL_TOOL = 0x1000
 };
@@ -124,6 +125,8 @@ enum {
 	TOOL_ROLLUP_ALL_WIN,
 	TOOL_RECOLOUR_TOOL,
 	TOOL_SHOW_FACTORY_STORAGE,
+	TOOL_TOGGLE_CONTROL,
+	TOOL_LOAD_SCENARIO,
 	SIMPLE_TOOL_COUNT,
 	SIMPLE_TOOL = 0x2000
 };
@@ -189,6 +192,7 @@ protected:
 	static karte_ptr_t welt;
 
 	const char *default_param;
+
 public:
 	uint16 get_id() const { return id; }
 
@@ -200,6 +204,9 @@ public:
 
 	// for key lookup
 	static vector_tpl<tool_t *>char_to_tool;
+
+	// true, if the control key should be inverted
+	static uint8 control_invert;
 
 	/// cursor image
 	image_id cursor;
@@ -224,7 +231,7 @@ public:
 	enum {
 		WFL_SHIFT  = 1 << 0, ///< shift-key was pressed when mouse-click happened
 		WFL_CTRL   = 1 << 1, ///< ctrl-key was pressed when mouse-click happened
-		WFL_LOCAL  = 1 << 2, ///< tool call was issued by local client
+		WFL_LOCAL  = 1 << 2, ///< tool call was issued by local client (and will not be sent to server)
 		WFL_SCRIPT = 1 << 3, ///< tool call was issued by script
 		WFL_NO_CHK = 1 << 4  ///< tool call needs no password or scenario checks
 	};
@@ -288,14 +295,13 @@ public:
 	virtual bool is_selected() const;
 
 	// when true, local execution would do no harm
-	virtual bool is_init_network_safe() const { return false; }
-	virtual bool is_move_network_safe(player_t *) const { return true; }
+	virtual bool is_init_keeps_game_state() const { return false; }
 
-	// if is_work_network_safe()==false
-	// and is_work_here_network_safe(...)==false
-	// then work-command is sent over network
-	virtual bool is_work_network_safe() const { return false; }
-	virtual bool is_work_here_network_safe(player_t *, koord3d) { return false; }
+	// if is_work_keeps_game_state()==false
+	// and is_work_here_keeps_game_state(...)==false
+	// then work-command is sent over network or must execute outside a sync_step
+	virtual bool is_work_keeps_game_state() const { return false; }
+	virtual bool is_work_here_keeps_game_state(player_t *, koord3d) { return false; }
 
 	// will draw a dark frame, if selected
 	virtual void draw_after(scr_coord pos, bool dirty) const;
@@ -384,7 +390,7 @@ public:
 	char const* move(player_t*, uint16 /* buttonstate */, koord3d) OVERRIDE;
 	bool move_has_effects() const OVERRIDE { return true; }
 
-	bool is_work_here_network_safe(player_t *, koord3d) OVERRIDE;
+	bool is_work_here_keeps_game_state(player_t *, koord3d) OVERRIDE;
 
 	/**
 	 * @returns true if cleanup() needs to be called before another tool can be executed
@@ -395,18 +401,13 @@ public:
 	bool is_first_click() const;
 
 	/**
-	 * Remove dummy grounds, remove start_marker.
+	 * Remove dummy grounds, remove start_marker if @p delete_start_marker is true.
 	 */
-	void cleanup() { cleanup(true); }
+	void cleanup(bool delete_start_marker = true);
 
 	const koord3d& get_start_pos() const { return start; }
 
 private:
-	/**
-	 * Remove dummy grounds, remove start_marker if @p delete_start_marker is true.
-	 */
-	void cleanup(bool delete_start_marker );
-
 	/*
 	 * This routine should fill marked_tiles.
 	 */
@@ -459,8 +460,8 @@ public:
 	tool_selector_t *get_tool_selector() const { return tool_selector; }
 	image_id get_icon(player_t*) const OVERRIDE;
 	bool is_selected() const OVERRIDE;
-	bool is_init_network_safe() const OVERRIDE { return true; }
-	bool is_work_network_safe() const OVERRIDE { return true; }
+	bool is_init_keeps_game_state() const OVERRIDE { return true; }
+	bool is_work_keeps_game_state() const OVERRIDE { return true; }
 	// show this toolbar
 	bool init(player_t*) OVERRIDE;
 	// close this toolbar

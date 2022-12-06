@@ -56,7 +56,7 @@ settings_frame_t::settings_frame_t(settings_t* const s) :
 	scrolly_climates.set_scroll_amount_y(D_BUTTON_HEIGHT/2);
 
 	tabs.add_tab(&scrolly_general, translator::translate("General"));
-	tabs.add_tab(&scrolly_display, translator::translate("Helligk."));
+	tabs.add_tab(&scrolly_display, translator::translate("Display settings"));
 	tabs.add_tab(&scrolly_economy, translator::translate("Economy"));
 	tabs.add_tab(&scrolly_routing, translator::translate("Routing"));
 	tabs.add_tab(&scrolly_costs, translator::translate("Costs"));
@@ -77,14 +77,13 @@ bool settings_frame_t::action_triggered( gui_action_creator_t *comp, value_t )
 		tabfile_t simuconf;
 		env_t::init();
 		*sets = settings_t();
-		dr_chdir( env_t::data_dir );
+		dr_chdir( env_t::base_dir );
 		if(simuconf.open("config/simuconf.tab")) {
 			sets->parse_simuconf( simuconf );
 			sets->parse_colours( simuconf );
 		}
-		stadt_t::cityrules_init(env_t::objfilename);
-		dr_chdir( env_t::data_dir );
-		dr_chdir( env_t::objfilename.c_str() );
+		stadt_t::cityrules_init();
+		dr_chdir( env_t::pak_dir.c_str() );
 		if(simuconf.open("config/simuconf.tab")) {
 			sets->parse_simuconf( simuconf );
 			sets->parse_colours( simuconf );

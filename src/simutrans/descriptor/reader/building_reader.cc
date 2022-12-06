@@ -205,7 +205,7 @@ void building_reader_t::register_obj(obj_desc_t *&data)
 		if(  desc->type != building_desc_t::factory  ) {
 			checksum_t *chk = new checksum_t();
 			desc->calc_checksum(chk);
-			pakset_info_t::append(desc->get_name(), get_type(), chk);
+			pakset_info_t::append(desc->get_name(), get_type_name(), chk);
 		}
 	}
 }
@@ -407,7 +407,7 @@ obj_desc_t * building_reader_t::read_node(FILE *fp, obj_node_info_t &node)
 		desc->animation_time = 300;
 	}
 	// there are additional nodes for cursor/icon
-	if(  node.children > 2+desc->size.x*desc->size.y*desc->layouts  ) {
+	if(  node.nchildren > 2+desc->size.x*desc->size.y*desc->layouts  ) {
 		desc->flags |= building_desc_t::FLAG_HAS_CURSOR;
 	}
 

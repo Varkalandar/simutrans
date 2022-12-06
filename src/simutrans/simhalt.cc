@@ -407,6 +407,7 @@ haltestelle_t::haltestelle_t(loadsave_t* file)
 
 	cargo = (vector_tpl<ware_t> **)calloc( goods_manager_t::get_max_catg_index(), sizeof(vector_tpl<ware_t> *) );
 	all_links = new link_t[ goods_manager_t::get_max_catg_index() ];
+	halt_served_this_step = new vector_tpl<halthandle_t>[goods_manager_t::get_max_catg_index()];
 
 	status_color = SYSCOL_TEXT_UNUSED;
 	last_status_color = color_idx_to_rgb(COL_PURPLE);
@@ -447,6 +448,7 @@ haltestelle_t::haltestelle_t(koord k, player_t* player)
 
 	cargo = (vector_tpl<ware_t> **)calloc( goods_manager_t::get_max_catg_index(), sizeof(vector_tpl<ware_t> *) );
 	all_links = new link_t[ goods_manager_t::get_max_catg_index() ];
+	halt_served_this_step = new vector_tpl<halthandle_t>[goods_manager_t::get_max_catg_index()];
 
 	status_color = SYSCOL_TEXT_UNUSED;
 	last_status_color = color_idx_to_rgb(COL_PURPLE);
@@ -518,6 +520,7 @@ haltestelle_t::~haltestelle_t()
 	}
 	free( cargo );
 	delete[] all_links;
+	delete[] halt_served_this_step;
 
 	// routes may have changed without this station ...
 	verbinde_fabriken();
@@ -971,6 +974,11 @@ bool haltestelle_t::has_available_network(const player_t* player, uint8 catg_ind
 
 bool haltestelle_t::step(uint8 what, sint16 &units_remaining)
 {
+	// reset served stops
+	for(  int i=0;  i < goods_manager_t::get_max_catg_index();  i++  ) {
+		halt_served_this_step[i].clear();
+	}
+
 	switch(what) {
 		case RECONNECTING:
 			units_remaining -= (rebuild_connections()/256)+2;
@@ -997,7 +1005,7 @@ void haltestelle_t::new_month()
 	if(  welt->get_active_player()==owner  &&  status_color==color_idx_to_rgb(COL_RED)  ) {
 		cbuffer_t buf;
 		buf.printf( translator::translate("%s\nis crowded."), get_name() );
-		welt->get_message()->add_message(buf, get_basis_pos(),message_t::full|message_t::expire_after_one_month_flag, PLAYER_FLAG|owner->get_player_nr(), IMG_EMPTY );
+		welt->get_message()->add_message(buf, get_basis_pos3d(),message_t::full|message_t::expire_after_one_month_flag, PLAYER_FLAG|owner->get_player_nr(), IMG_EMPTY );
 		enables &= (PAX|POST|WARE);
 	}
 
@@ -1359,6 +1367,9 @@ sint8 haltestelle_t::is_connected(halthandle_t halt, uint8 catg_index) const
 {
 	if (!halt.is_bound()) {
 		return 0; // not connected
+	}
+	if (halt == self) {
+		return 1;
 	}
 	const link_t& linka =       all_links[catg_index];
 	const link_t& linkb = halt->all_links[catg_index];
@@ -2079,65 +2090,67 @@ void haltestelle_t::fetch_goods( slist_tpl<ware_t> &load, const goods_desc_t *go
 		for(  uint32 i=0; i < destination_halts.get_count();  i++  ) {
 			halthandle_t plan_halt = destination_halts[i];
 
-				// The random offset will ensure that all goods have an equal chance to be loaded.
-				uint32 offset = simrand(warray->get_count());
-				for(  uint32 i=0;  i<warray->get_count();  i++  ) {
-					ware_t &tmp = (*warray)[ i+offset ];
+			// mark this stop as served
+			halt_served_this_step[good_category->get_catg_index()].append_unique(plan_halt);
 
-					// prevent overflow (faster than division)
-					if(  i+offset+1>=warray->get_count()  ) {
-						offset -= warray->get_count();
-					}
+			// The random offset will ensure that all goods have an equal chance to be loaded.
+			uint32 offset = simrand(warray->get_count());
+			for(  uint32 i=0;  i<warray->get_count();  i++  ) {
+				ware_t &tmp = (*warray)[ i+offset ];
 
-					// skip empty entries
-					if(tmp.menge==0) {
+				// prevent overflow (faster than division)
+				if(  i+offset+1>=warray->get_count()  ) {
+					offset -= warray->get_count();
+				}
+
+				// skip empty entries
+				if(tmp.menge==0) {
+					continue;
+				}
+
+				// goods without route -> returning passengers/mail
+				if(  !tmp.get_zwischenziel().is_bound()  ) {
+					search_route_resumable(tmp);
+					if (!tmp.get_ziel().is_bound()) {
+						// no route anymore
+						tmp.menge = 0;
 						continue;
 					}
+				}
 
-					// goods without route -> returning passengers/mail
-					if(  !tmp.get_zwischenziel().is_bound()  ) {
-						search_route_resumable(tmp);
-						if (!tmp.get_ziel().is_bound()) {
-							// no route anymore
-							tmp.menge = 0;
+				// compatible car and right target stop?
+				if(  tmp.get_zwischenziel()==plan_halt  ) {
+					if(  plan_halt->is_overcrowded( tmp.get_index() )  ) {
+						if (welt->get_settings().is_avoid_overcrowding() && tmp.get_ziel() != plan_halt) {
+							// do not go for transfer to overcrowded transfer stop
 							continue;
 						}
 					}
 
-					// compatible car and right target stop?
-					if(  tmp.get_zwischenziel()==plan_halt  ) {
-						if(  plan_halt->is_overcrowded( tmp.get_index() )  ) {
-							if (welt->get_settings().is_avoid_overcrowding() && tmp.get_ziel() != plan_halt) {
-								// do not go for transfer to overcrowded transfer stop
-								continue;
-							}
-						}
+					// not too much?
+					ware_t neu(tmp);
+					if(  tmp.menge > requested_amount  ) {
+						// not all can be loaded
+						neu.menge = requested_amount;
+						tmp.menge -= requested_amount;
+						requested_amount = 0;
+					}
+					else {
+						requested_amount -= tmp.menge;
+						// leave an empty entry => joining will more often work
+						tmp.menge = 0;
+					}
+					load.insert(neu);
 
-						// not too much?
-						ware_t neu(tmp);
-						if(  tmp.menge > requested_amount  ) {
-							// not all can be loaded
-							neu.menge = requested_amount;
-							tmp.menge -= requested_amount;
-							requested_amount = 0;
-						}
-						else {
-							requested_amount -= tmp.menge;
-							// leave an empty entry => joining will more often work
-							tmp.menge = 0;
-						}
-						load.insert(neu);
+					book(neu.menge, HALT_DEPARTED);
+					resort_freight_info = true;
 
-						book(neu.menge, HALT_DEPARTED);
-						resort_freight_info = true;
-
-						if (requested_amount==0) {
-							return;
-						}
+					if (requested_amount==0) {
+						return;
 					}
 				}
-
-				// nothing there to load
+			}
+			// nothing there to load
 		}
 	}
 }
@@ -2292,15 +2305,17 @@ dbg->warning("haltestelle_t::liefere_an()","%d %s delivered to %s have no longer
 		}
 		else if(  ware.is_passenger()  ) {
 			// arriving passenger may create pedestrians
-			if(  welt->get_settings().get_show_pax()  ) {
+			if(env_t::stop_pedestrians) {
 				int menge = ware.menge;
 				for(tile_t const& i : tiles ) {
 					if (menge <= 0) {
 						break;
 					}
-					menge = generate_pedestrians(i.grund->get_pos(), menge);
+					if(  (station_type & (loadingbay | busstop)) == 0  ||  i.grund->get_weg(road_wt)  ) {
+						// if the station has road tiles, then start passenger generation there to speed things up
+						menge = pedestrian_t::generate_pedestrians_near(i.grund, menge);
+					}
 				}
-				INT_CHECK("simhalt 938");
 			}
 		}
 		return ware.menge;
@@ -2460,7 +2475,7 @@ void haltestelle_t::change_owner( player_t *player )
 					if(  owner != welt->get_public_player()  &&  env_t::networkmode  &&  !has_been_announced  ) {
 						cbuffer_t buf;
 						buf.printf( translator::translate("(%s) now public way."), w->get_pos().get_str() );
-						welt->get_message()->add_message( buf, w->get_pos().get_2d(), message_t::ai, PLAYER_FLAG|player->get_player_nr(), IMG_EMPTY );
+						welt->get_message()->add_message( buf, w->get_pos(), message_t::ai, PLAYER_FLAG|player->get_player_nr(), IMG_EMPTY );
 						has_been_announced = true; // one message is enough
 					}
 					cost = -welt->scale_with_month_length(cost * (player==welt->get_public_player())*welt->get_settings().cst_make_public_months );
@@ -2497,7 +2512,7 @@ void haltestelle_t::change_owner( player_t *player )
 	if(  player == welt->get_public_player()  &&  env_t::networkmode  ) {
 		cbuffer_t buf;
 		buf.printf( translator::translate("%s at (%i,%i) now public stop."), get_name(), get_basis_pos().x, get_basis_pos().y );
-		welt->get_message()->add_message( buf, get_basis_pos(), message_t::ai, PLAYER_FLAG|player->get_player_nr(), IMG_EMPTY );
+		welt->get_message()->add_message( buf, get_basis_pos3d(), message_t::ai, PLAYER_FLAG|player->get_player_nr(), IMG_EMPTY );
 	}
 }
 
@@ -2696,15 +2711,6 @@ void haltestelle_t::recalc_station_type()
 }
 
 
-
-int haltestelle_t::generate_pedestrians(koord3d pos, int count)
-{
-	pedestrian_t::generate_pedestrians_at(pos, count);
-	for(int i=0; i<4 && count>0; i++) {
-		pedestrian_t::generate_pedestrians_at(pos+koord::nesw[i], count);
-	}
-	return count;
-}
 
 // necessary to load pre0.99.13 savegames
 void warenziel_rdwr(loadsave_t *file)

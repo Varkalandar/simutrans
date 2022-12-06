@@ -323,7 +323,7 @@ void nwc_chat_t::add_message (karte_t* welt) const
 			buf.printf( "%s --> %s: %s", clientname.c_str(), destination.c_str(), message.c_str() );
 		}
 	}
-	welt->get_message()->add_message( buf.get_str(), koord::invalid, flag, color, IMG_EMPTY );
+	welt->get_message()->add_message( buf.get_str(), koord3d::invalid, flag, color, IMG_EMPTY );
 }
 
 
@@ -789,7 +789,7 @@ void nwc_sync_t::do_command(karte_t *welt)
 		if(  sock != INVALID_SOCKET  ) {
 			nwc_ready_t nwc( old_sync_steps, welt->get_map_counter(), welt->get_checklist_at(old_sync_steps) );
 			if (nwc.send(sock)) {
-				socket_list_t::change_state( client_id, socket_info_t::playing);
+				socket_list_t::change_state(client_id, socket_info_t::playing);
 				if (socket_list_t::is_valid_client_id(client_id)) {
 					socket_list_t::get_client(client_id).player_unlocked = unlocked_players;
 					// send information about locked state
@@ -799,6 +799,9 @@ void nwc_sync_t::do_command(karte_t *welt)
 
 					// welcome message
 					nwc_nick_t::server_tools(welt, client_id, nwc_nick_t::WELCOME, NULL);
+				}
+				else {
+					dbg->warning("nwc_sync_t::do_command(karte_t *welt)", "client_id %d became invalid during sync!", client_id);
 				}
 			}
 			else {
@@ -1081,7 +1084,7 @@ network_broadcast_world_command_t* nwc_tool_t::clone(karte_t *welt)
 	}
 
 	// do not open dialog windows across network
-	if (  init  ?  tool->is_init_network_safe() :  tool->is_work_network_safe() ){
+	if (  init  ?  tool->is_init_keeps_game_state() :  tool->is_work_keeps_game_state() ){
 		// no reason to send request over network
 		return NULL;
 	}
@@ -1194,7 +1197,7 @@ void nwc_tool_t::do_command(karte_t *welt)
 	assert(tool);
 	bool init_successfull = true;
 	if (!init) {
-		// init command was not sent if tool->is_init_network_safe() returned true
+		// init command was not sent if tool->is_init_keeps_game_state() returned true
 		tool->flags = 0;
 		// init tool
 		init_successfull = tool->init(player);

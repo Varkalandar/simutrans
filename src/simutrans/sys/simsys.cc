@@ -393,9 +393,73 @@ char const *dr_query_homedir()
 	find_directory(B_USER_DIRECTORY, &userDir);
 	sprintf(buffer, "%s/simutrans", userDir.Path());
 #elif defined __ANDROID__
+	buffer[0] = 0;
+	int state = SDL_AndroidGetExternalStorageState();
+	if (state & SDL_ANDROID_EXTERNAL_STORAGE_WRITE) {
+		const char* p = SDL_AndroidGetExternalStoragePath();
+		if (p) {
+			strcpy(buffer, p);
+			dr_mkdir("/sdcard/simutrans");
+		}
+	}
+	if (!*buffer) {
+		dbg->warning("dr_query_homedir()", "SDL_AndroidGetExternalStoragePath() failed.");
+		// no permission
+		tstrncpy(buffer, SDL_GetPrefPath("Simutrans Team", "simutrans"), lengthof(buffer));
+	}
+#else
+	if( getenv("XDG_DATA_HOME") == NULL ) {
+		sprintf(buffer, "%s/simutrans", getenv("HOME"));
+	} else {
+		sprintf(buffer, "%s/simutrans", getenv("XDG_DATA_HOME"));
+	}
+#endif
+
+	// create directory and subdirectories
+	dr_mkdir(buffer);
+	strcat(buffer, PATH_SEPARATOR);
+	return buffer;
+}
+
+
+char const *dr_query_installdir()
+{
+	static char buffer[PATH_MAX + 24];
+
+#if defined _WIN32
+	WCHAR whomedir[MAX_PATH];
+	if(FAILED(SHGetFolderPathW(NULL, CSIDL_COMMON_APPDATA|CSIDL_FLAG_CREATE, NULL, SHGFP_TYPE_CURRENT, whomedir))) {
+		return NULL;
+	}
+
+	// Convert UTF-16 to UTF-8.
+	int const convert_size = WideCharToMultiByte(CP_UTF8, 0, whomedir, -1, buffer, sizeof(buffer), NULL, NULL);
+	if(convert_size == 0) {
+		return NULL;
+	}
+
+	// Append Simutrans folder.
+	char const foldername[] = "Simutrans";
+	if(lengthof(buffer) < strlen(buffer) + strlen(foldername) + 2 * strlen(PATH_SEPARATOR) + 1){
+		return NULL;
+	}
+	strcat(buffer, PATH_SEPARATOR);
+	strcat(buffer, foldername);
+#elif defined __APPLE__
+	sprintf(buffer, "%s/Library/Simutrans/paksets", getenv("HOME"));
+#elif defined __HAIKU__
+	BPath userDir;
+	find_directory(B_USER_DIRECTORY, &userDir);
+	sprintf(buffer, "%s/simutrans/paksets", userDir.Path());
+#elif defined __ANDROID__
 	tstrncpy(buffer,SDL_GetPrefPath("Simutrans Team","simutrans"),lengthof(buffer));
 #else
-	sprintf(buffer, "%s/simutrans", getenv("HOME"));
+	if( getenv("XDG_DATA_HOME") == NULL ) {
+		sprintf(buffer, "%s/simutrans/paksets", getenv("HOME"));
+	}
+	else {
+		sprintf(buffer, "%s/simutrans/paksets", getenv("XDG_DATA_HOME"));
+	}
 #endif
 
 	// create directory and subdirectories
@@ -409,25 +473,8 @@ char const *dr_query_homedir()
 
 const char *dr_query_fontpath(int which)
 {
-	static char buffer[PATH_MAX];
 #ifdef _WIN32
-	if(  which>0  ) {
-		return NULL;
-	}
-
-	WCHAR fontdir[MAX_PATH];
-	if(FAILED(SHGetFolderPathW(NULL, CSIDL_FONTS, NULL, SHGFP_TYPE_CURRENT, fontdir))) {
-		wcscpy(fontdir, L"C:\\Windows\\Fonts");
-	}
-
-	// Convert UTF-16 to UTF-8.
-	int const convert_size = WideCharToMultiByte(CP_UTF8, 0, fontdir, -1, buffer, sizeof(buffer), NULL, NULL);
-	if(convert_size == 0) {
-		return 0;
-	}
-
-	strcat(buffer, PATH_SEPARATOR);
-	return buffer;
+	return which > 0 ? NULL : "C:/Windows/Fonts/";
 #else
 	// linux has more than one path
 	// sometimes there is the file "/etc/fonts/fonts.conf" and we can read it
@@ -453,50 +500,16 @@ const char *dr_query_fontpath(int which)
 #endif
 		NULL
 	};
-
-	// since we include subdirectories (one level!) too
-	static int which_offset, subdir_offset;
-	if( which == 0 ) {
-		which_offset = 0;
-		subdir_offset = 0;
-	}
-
-	for( int i = which - which_offset; trypaths[ i ]; i++ ) {
+	if( trypaths[which] != NULL ) {
 		static char fontpath[PATH_MAX];
-		if( trypaths[i][0] == '~' ) {
+		if( trypaths[which][0] == '~' ) {
 			// prepace with homedirectory
-			snprintf( fontpath, PATH_MAX, "%s/%s", getenv("HOME"), trypaths[i]+2 );
+			snprintf( fontpath, PATH_MAX, "%s/%s", getenv("HOME"), trypaths[which]+2 );
 		}
 		else {
-			tstrncpy( fontpath, trypaths[i], PATH_MAX );
+			tstrncpy( fontpath, trypaths[which], PATH_MAX );
 		}
-		DIR *dir = opendir(fontpath);
-		if(  dir  ) {
-			int j = 0;
-			// look for subdirectories
-			struct dirent *entry;
-			while( (entry = readdir( dir )) ) {
-				if( entry->d_type == DT_DIR ) {
-					if( ((strcmp( entry->d_name, "." )) != 0) && ((strcmp( entry->d_name, ".." )) != 0) ) {
-						j++;
-						if( subdir_offset < j ) {
-							strcpy( buffer, fontpath );
-							strcat( buffer, entry->d_name );
-							strcat( buffer, PATH_SEPARATOR );
-							closedir( dir );
-							subdir_offset++;
-							which_offset++;
-							return buffer;
-						}
-					}
-				}
-			}
-			// last return parent folder
-			closedir( dir );
-			subdir_offset = 0; // we do not increase which_offset, so next the the next folder will be searched
-			return fontpath;
-		}
-		which_offset--;
+		return fontpath;
 	}
 	return NULL;
 #endif

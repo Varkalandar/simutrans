@@ -3,8 +3,8 @@
  * (see LICENSE.txt)
  */
 
-#ifndef SIMCITY_H
-#define SIMCITY_H
+#ifndef WORLD_SIMCITY_H
+#define WORLD_SIMCITY_H
 
 
 #include "../obj/simobj.h"
@@ -104,7 +104,8 @@ public:
 	/**
 	 * Reads city configuration data from config/cityrules.tab
 	 */
-	static bool cityrules_init(const std::string &objpathname);
+	static bool cityrules_init();
+
 	/**
 	 * Reads/writes city configuration data from/to a savegame
 	 * called from settings_t::rdwr

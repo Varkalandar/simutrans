@@ -12,6 +12,7 @@
 #include <string.h>
 
 #include "../simunits.h"
+#include "../simintr.h"
 #include "../world/simworld.h"
 #include "../vehicle/vehicle.h"
 #include "../simconvoi.h"
@@ -129,6 +130,7 @@ enum {
 	LB_VEH_AUTHOR,
 	LB_VEH_POWER,
 	LB_VEH_VALUE,
+	LB_VEH_LOADINGTIME,
 	LB_MAX,
 	LB_CNV_ALL = LB_VEH_NAME
 };
@@ -170,8 +172,6 @@ void depot_frame_t::init(depot_t *dep)
 	set_owner(depot->get_owner());
 	icnv = depot->convoi_count()-1;
 	veh_action = va_append;
-
-	scr_size size = scr_size(0,0);
 
 	last_selected_line = depot->get_last_selected_line();
 	no_schedule_text     = translator::translate("<no schedule set>");
@@ -374,11 +374,12 @@ void depot_frame_t::init(depot_t *dep)
 	cont_vehicle_labels->add_component(labels[LB_VEH_COST]);
 	cont_vehicle_labels->add_component(labels[LB_VEH_WEIGHT]);
 	cont_vehicle_labels->add_component(labels[LB_VEH_CAPACITY]);
-	cont_vehicle_labels->add_component(labels[LB_VEH_DATE]);
+	cont_vehicle_labels->add_component(labels[LB_VEH_LOADINGTIME]);
 	cont_vehicle_labels->add_component(labels[LB_VEH_SPEED]);
-	cont_vehicle_labels->add_component(labels[LB_VEH_AUTHOR]);
+	cont_vehicle_labels->add_component(labels[LB_VEH_DATE]);
 	cont_vehicle_labels->add_component(labels[LB_VEH_POWER]);
 	cont_vehicle_labels->add_component(labels[LB_VEH_VALUE]);
+	cont_vehicle_labels->add_component(labels[LB_VEH_AUTHOR]);
 	add_component(cont_vehicle_labels);
 	/*
 	 * [END OF WINDOW]
@@ -426,7 +427,7 @@ void depot_frame_t::init(depot_t *dep)
 	update_data();
 
 	reset_min_windowsize();
-	set_windowsize(size);
+	set_windowsize(get_min_windowsize());
 	set_resizemode( diagonal_resize );
 
 	depot->clear_command_pending();
@@ -867,6 +868,7 @@ void depot_frame_t::update_data()
 	for(int i = 0; i < vehicle_builder_t::sb_length; i++) {
 		sort_by.new_component<gui_scrolled_list_t::const_text_scrollitem_t>(translator::translate(vehicle_builder_t::vehicle_sort_by[i]), SYSCOL_TEXT);
 	}
+	sort_by.set_size(sort_by.get_size());
 	if(  depot->selected_sort_by > sort_by.count_elements()  ) {
 		depot->selected_sort_by = vehicle_builder_t::sb_name;
 	}
@@ -1131,7 +1133,7 @@ bool depot_frame_t::action_triggered( gui_action_creator_t *comp, value_t p)
 				//first: close schedule (will update schedule on clients)
 				destroy_win( (ptrdiff_t)cnv->get_schedule() );
 				// only then call the tool to start
-				char tool = event_get_last_control_shift() == 2 ? 'B' : 'b'; // start all with CTRL-click
+				char tool = (event_get_last_control_shift() ^ tool_t::control_invert)==2 ? 'B' : 'b'; // start all with CTRL-click
 				depot->call_depot_tool( tool, cnv, NULL);
 			}
 		}
@@ -1333,13 +1335,9 @@ void depot_frame_t::draw(scr_coord pos, scr_size size)
 {
 	const bool action_allowed = welt->get_active_player() == depot->get_owner();
 
-	bt_new_line.enable( action_allowed );
-	bt_change_line.enable( action_allowed );
 	bt_copy_convoi.enable( action_allowed );
-	bt_apply_line.enable( action_allowed );
 	bt_start.enable( action_allowed );
 	bt_schedule.enable( action_allowed );
-	bt_destroy.enable( action_allowed );
 	bt_sell.enable( action_allowed );
 	bt_obsolete.enable( action_allowed );
 	bt_show_all.enable( action_allowed );
@@ -1395,7 +1393,7 @@ void depot_frame_t::open_schedule_editor()
 	convoihandle_t cnv = depot->get_convoi( icnv );
 
 	if(  cnv.is_bound()  &&  cnv->get_vehicle_count() > 0  ) {
-		if(  selected_line.is_bound()  &&  event_get_last_control_shift() == 2  ) { // update line with CTRL-click
+		if(  selected_line.is_bound()  &&  (event_get_last_control_shift() ^ tool_t::control_invert)==2  ) { // update line with CTRL-click
 			create_win( new line_management_gui_t( selected_line, depot->get_owner(), 0 ), w_info, (ptrdiff_t)selected_line.get_rep() );
 		}
 		else { // edit individual schedule
@@ -1416,11 +1414,11 @@ void depot_frame_t::update_vehicle_info_text(scr_coord pos)
 		const uint32 count = depot->get_vehicle_list().get_count();
 		switch (count) {
 			case 0: {
-				lb_convoi_count.buf().append(translator::translate("Keine Einzelfahrzeuge im Depot"));
+				lb_convoi_count.buf().append( translator::translate("Keine Einzelfahrzeuge im Depot") );
 				break;
 			}
 			case 1: {
-				lb_convoi_count.buf().append("1 Einzelfahrzeug im Depot");
+				lb_convoi_count.buf().append( translator::translate("1 Einzelfahrzeug im Depot") );
 				break;
 			}
 			default: {
@@ -1505,9 +1503,11 @@ void depot_frame_t::update_vehicle_info_text(scr_coord pos)
 				translator::translate( veh_type->get_freight_type()->get_mass() ),
 				veh_type->get_freight_type()->get_catg()==0 ? translator::translate( veh_type->get_freight_type()->get_name() ) : translator::translate( veh_type->get_freight_type()->get_catg_name() )
 				);
+			labels[LB_VEH_LOADINGTIME]->buf().printf("%s%s", translator::translate("Loading time:"), difftick_to_string(veh_type->get_loading_time(), false));
 		}
 		else {
 			labels[LB_VEH_CAPACITY]->buf().clear();
+			labels[LB_VEH_LOADINGTIME]->buf().clear();
 		}
 
 		labels[LB_VEH_SPEED]->buf().printf( "%s %3d km/h\n", translator::translate("Max. speed:"), veh_type->get_topspeed() );

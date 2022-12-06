@@ -120,6 +120,14 @@ gui_settings_t::gui_settings_t()
 	}
 	add_component(&toolbar_pos,2);
 
+	single_toolbar.init( button_t::square_state, "Single toolbar only" );
+	single_toolbar.pressed = ( env_t::single_toolbar_mode );
+	add_component( &single_toolbar, 3 );
+
+	reselect_closes_tool.init( button_t::square_state, "Reselect closes tools" );
+	reselect_closes_tool.pressed = env_t::reselect_closes_tool;
+	add_component( &reselect_closes_tool, 3 );
+
 	fullscreen.init( button_t::square_state, "Fullscreen (changed after restart)" );
 	fullscreen.pressed = ( dr_get_fullscreen() == FULLSCREEN );
 	fullscreen.enable(dr_has_fullscreen());
@@ -129,10 +137,6 @@ gui_settings_t::gui_settings_t()
 	borderless.enable ( dr_get_fullscreen() != FULLSCREEN );
 	borderless.pressed = ( dr_get_fullscreen() == BORDERLESS );
 	add_component( &borderless, 3 );
-
-	reselect_closes_tool.init( button_t::square_state, "Reselect closes tools" );
-	reselect_closes_tool.pressed = env_t::reselect_closes_tool;
-	add_component( &reselect_closes_tool, 3 );
 
 	// Frame time label
 	new_component<gui_label_t>("Frame time:");
@@ -195,13 +199,14 @@ void gui_settings_t::draw(scr_coord offset)
 }
 
 
-bool gui_settings_t::action_triggered(gui_action_creator_t *comp, value_t)
+bool gui_settings_t::action_triggered(gui_action_creator_t *comp, value_t v)
 {
 	if (comp == &screen_scale_numinp) {
-		const sint16 new_value = screen_scale_numinp.get_value();
-		dr_set_screen_scale(new_value);
+		env_t::dpi_scale = v.i;
+		dr_set_screen_scale(v.i);
 	}
 	else if (comp == &screen_scale_auto) {
+		env_t::dpi_scale = -1;
 		dr_set_screen_scale(-1);
 		screen_scale_numinp.set_value(dr_get_screen_scale());
 	}
@@ -433,12 +438,12 @@ traffic_settings_t::traffic_settings_t()
 
 	// Pedestrians in towns checkbox
 	buttons[IDBTN_PEDESTRIANS_IN_TOWNS].init(button_t::square_state, "6LIGHT_CHOOSE");
-	buttons[IDBTN_PEDESTRIANS_IN_TOWNS].pressed = world()->get_settings().get_random_pedestrians();
+	buttons[IDBTN_PEDESTRIANS_IN_TOWNS].pressed = env_t::random_pedestrians;
 	add_component(buttons+IDBTN_PEDESTRIANS_IN_TOWNS, 2);
 
 	// Pedestrians at stops checkbox
 	buttons[IDBTN_PEDESTRIANS_AT_STOPS].init(button_t::square_state, "5LIGHT_CHOOSE");
-	buttons[IDBTN_PEDESTRIANS_AT_STOPS].pressed = world()->get_settings().get_show_pax();
+	buttons[IDBTN_PEDESTRIANS_AT_STOPS].pressed = env_t::stop_pedestrians;
 	add_component(buttons+IDBTN_PEDESTRIANS_AT_STOPS, 2);
 
 	// Traffic density label
@@ -517,7 +522,7 @@ bool traffic_settings_t::action_triggered( gui_action_creator_t *comp, value_t v
 
 
 color_gui_t::color_gui_t() :
-	gui_frame_t( translator::translate( "Helligk. u. Farben" ) ),
+	gui_frame_t( translator::translate( "Display settings" ) ),
 	scrolly_gui(&gui_settings),
 	scrolly_map(&map_settings),
 	scrolly_transparency(&transparency_settings),
@@ -543,13 +548,14 @@ color_gui_t::color_gui_t() :
 		buttons[ i ].add_listener( this );
 	}
 	gui_settings.toolbar_pos.add_listener( this );
+	gui_settings.single_toolbar.add_listener(this);
+	gui_settings.reselect_closes_tool.add_listener(this);
 	gui_settings.fullscreen.add_listener( this );
 	gui_settings.borderless.add_listener( this );
-	gui_settings.reselect_closes_tool.add_listener(this);
 
 	set_resizemode(diagonal_resize);
-	set_min_windowsize( scr_size(D_DEFAULT_WIDTH,get_min_windowsize().h+map_settings.get_size().h) );
-	set_windowsize( scr_size(D_DEFAULT_WIDTH,get_min_windowsize().h+map_settings.get_size().h) );
+	set_min_windowsize( gui_settings.get_min_size()+scr_size(0,D_TAB_HEADER_HEIGHT) );
+	set_windowsize( get_min_windowsize()+map_settings.get_min_size() );
 	resize( scr_coord( 0, 0 ) );
 }
 
@@ -595,6 +601,12 @@ bool color_gui_t::action_triggered( gui_action_creator_t *comp, value_t)
 		return true;
 	}
 
+	if(  comp == &gui_settings.single_toolbar  ) {
+		env_t::single_toolbar_mode = !env_t::single_toolbar_mode;
+		gui_settings.single_toolbar.pressed = env_t::single_toolbar_mode;
+		return true;
+	}
+
 	int i;
 	for(  i=0;  i<COLORS_MAX_BUTTONS  &&  comp!=buttons+i;  i++  ) { }
 
@@ -611,14 +623,10 @@ bool color_gui_t::action_triggered( gui_action_creator_t *comp, value_t)
 		env_t::scroll_infinite ^= 1;
 		break;
 	case IDBTN_PEDESTRIANS_AT_STOPS:
-		if( !env_t::networkmode || welt->get_active_player_nr() == PUBLIC_PLAYER_NR ) {
-			welt->set_tool( tool_t::simple_tool[ TOOL_TOOGLE_PAX & 0xFFF ], welt->get_active_player() );
-		}
+		welt->set_tool( tool_t::simple_tool[ TOOL_TOOGLE_PAX & 0xFFF ], welt->get_active_player() );
 		break;
 	case IDBTN_PEDESTRIANS_IN_TOWNS:
-		if( !env_t::networkmode || welt->get_active_player_nr() == PUBLIC_PLAYER_NR ) {
-			welt->set_tool( tool_t::simple_tool[ TOOL_TOOGLE_PEDESTRIANS & 0xFFF ], welt->get_active_player() );
-		}
+		welt->set_tool( tool_t::simple_tool[ TOOL_TOOGLE_PEDESTRIANS & 0xFFF ], welt->get_active_player() );
 		break;
 	case IDBTN_HIDE_TREES:
 		env_t::hide_trees = !env_t::hide_trees;
@@ -707,8 +715,8 @@ bool color_gui_t::action_triggered( gui_action_creator_t *comp, value_t)
 void color_gui_t::draw(scr_coord pos, scr_size size)
 {
 	// Update button states that was changed with keyboard ...
-	buttons[IDBTN_PEDESTRIANS_AT_STOPS].pressed = welt->get_settings().get_show_pax();
-	buttons[IDBTN_PEDESTRIANS_IN_TOWNS].pressed = welt->get_settings().get_random_pedestrians();
+	buttons[IDBTN_PEDESTRIANS_AT_STOPS].pressed = env_t::stop_pedestrians;
+	buttons[IDBTN_PEDESTRIANS_IN_TOWNS].pressed = env_t::random_pedestrians;
 	buttons[IDBTN_HIDE_TREES].pressed = env_t::hide_trees;
 	buttons[IDBTN_HIDE_BUILDINGS].pressed = env_t::hide_under_cursor;
 	buttons[IDBTN_SHOW_STATION_COVERAGE].pressed = env_t::station_coverage_show;

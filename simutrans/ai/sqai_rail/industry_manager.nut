@@ -9,15 +9,15 @@
 class my_line_t extends line_x
 {
 	//dings_bums = 0 // extra data, you can put more such variables here.
-	double_ways_count		= 0 // count of double way build
-	double_ways_build		= 0 // double way build: 0 = no ; 1 = yes
-	optimize_way_line		= 0 // is way line optimize: 0 = no ; 1 = yes
-	destroy_line_month	= world.get_time().month // test month save
-	line_way_speed			= 0 // save way speed for line
-	build_line					= world.get_time() // create line
+	double_ways_count   = 0 // count of double way build
+	double_ways_build   = 0 // double way build: 0 = no ; 1 = yes
+	optimize_way_line   = 0 // is way line optimize: 0 = no ; 1 = run 1 ; 2 = run 2 ....
+	destroy_line_month  = world.get_time().month // test month save
+	line_way_speed      = 0 // save way speed for line
+	build_line          = world.get_time() // create line
 	next_vehicle_check  = 0 // save ticks for next vehicle check
-	next_check 					= world.get_time().ticks
-  halt_length         = 0 // tiles from halts
+	next_check          = world.get_time().ticks
+	halt_length         = 0 // tiles from halts
 
 	constructor(line /* line_x */)
 	{
@@ -43,12 +43,12 @@ class industry_link_t
 	state = 0
 	lines = null   // array<line_x>
 	/*
-	double_ways_count		= 0 // count of double way build
-	double_ways_build		= 0 // double way build: 0 = no ; 1 = yes
-	optimize_way_line		= 0 // is way line optimize: 0 = no ; 1 = yes
-	destroy_line_month	= null // test month save
-	line_way_speed			= 0 // save way speed for line
-	build_line					= 0 // create line
+	double_ways_count   = 0 // count of double way build
+	double_ways_build   = 0 // double way build: 0 = no ; 1 = yes
+	optimize_way_line   = 0 // is way line optimize: 0 = no ; 1 = yes
+	destroy_line_month  = null // test month save
+	line_way_speed      = 0 // save way speed for line
+	build_line          = 0 // create line
 	next_vehicle_check  = 0 // save ticks for next vehicle check
 	*/
 	// next check needed if ticks > next_check
@@ -243,30 +243,13 @@ class industry_manager_t extends manager_t
 			}
 		}
 
-		// check all 10 years ( year xxx0 )
-		local yt = world.get_time().year.tostring()
-		// Zeitfenster am Monatsanfang um Daueraufruf zu vermeiden im Monat
-		local mnt_ticks = world.get_time().next_month_ticks - world.get_time().ticks_per_month + 3500
 
-  	if ( yt.slice(-1) == "0" && world.get_time().month == 3 && mnt_ticks > world.get_time().ticks ) {
-			// in april
-			//gui.add_message_at(our_player, "####### year check " + yt, world.get_time())
-			check_pl_lines()
-			//::debug.pause(),
-		}
-
-		// check all 5 years ( year xxx0 and xxx5 )
-		mnt_ticks = world.get_time().next_month_ticks - world.get_time().ticks_per_month + 1000
-  	if ( (yt.slice(-1) == "0" || yt.slice(-1) == "5") && world.get_time().month == 4 && mnt_ticks > world.get_time().ticks ) {
-			// in may
-			// check unused halts
-			check_stations_connections()
-		}
 		return true
 	}
 
+
 	/**
-	  *
+		*
 		*
 		*
 		*/
@@ -316,13 +299,13 @@ class industry_manager_t extends manager_t
 		if ( line_list.get_count() > line_ai_count ) {
 			for ( local i = 0; i < ai_lines_missing.len(); i++ ) {
 				// rename line
-				local line_name		= ai_lines_missing[i].get_name()
-				local str_search	= ") " + translate("Line")
-				local st_names		= ai_lines_missing[i].get_schedule().entries
-				local wt_name			= ["", "road", "Train", "Ship"]
+				local line_name   = ai_lines_missing[i].get_name()
+				local str_search  = ") " + translate("Line")
+				local st_names    = ai_lines_missing[i].get_schedule().entries
+				local wt_name     = ["", "road", "Train", "Ship"]
 
-     		local f_src		= st_names[0].get_halt(our_player).get_factory_list()
-     		local f_dest	= st_names[st_names.len()-1].get_halt(our_player).get_factory_list()
+				local f_src   = st_names[0].get_halt(our_player).get_factory_list()
+				local f_dest  = st_names[st_names.len()-1].get_halt(our_player).get_factory_list()
 
 				local freight = ""
 				if ( f_src.len() == 1 && f_dest.len() == 1 ) {
@@ -356,7 +339,7 @@ class industry_manager_t extends manager_t
 						}
 						if ( cline_list.len() == 1 ) {
 							local cline_st_names = cline_list[0].get_schedule().entries
-							f_src	= cline_st_names[0].get_halt(our_player).get_factory_list()
+							f_src = cline_st_names[0].get_halt(our_player).get_factory_list()
 							if ( f_src.len() == 1 ) {
 								local good_list_out = []
 								foreach(good, islot in f_src[0].output) {
@@ -398,16 +381,14 @@ class industry_manager_t extends manager_t
 		}
 
 		if ( line_list.get_count() > line_ai_count ) {
-		  if ( print_message_box == 1 ) {
-			  gui.add_message_at(player_x(our_player.nr), our_player.get_name() + " ####### line check: not all listet in ai lines ", world.get_time())
-			  gui.add_message_at(player_x(our_player.nr), " ####### line check: line_list.get_count() " + line_list.get_count() + " ## line_ai_count " + line_ai_count, world.get_time())
-      }
+			if ( print_message_box == 1 ) {
+				gui.add_message_at(player_x(our_player.nr), our_player.get_name() + " ####### line check: not all listet in ai lines ", world.get_time())
+				gui.add_message_at(player_x(our_player.nr), " ####### line check: line_list.get_count() " + line_list.get_count() + " ## line_ai_count " + line_ai_count, world.get_time())
+			}
 			for ( local i = 0; i < ai_lines_missing.len(); i++ ) {
 				gui.add_message_at(player_x(our_player.nr), "####### line missing " + ai_lines_missing[i].get_name(), world.get_time())
 			}
 		}
-
-
 
 	}
 
@@ -421,32 +402,60 @@ class industry_manager_t extends manager_t
 
 		// set first run as line build time
 		/*if ( line.build_line == 0 ) {
-  		line.build_line = world.get_time()
+			line.build_line = world.get_time()
 		}*/
 
 		// set next check
 		line.next_check = world.get_time().ticks + world.get_time().ticks_per_month
 
 		// 0 = off
-    // 1
-    // 2
-    // 3
-    // 4 = cnv status retired
-    // 5 =
+		// 1
+		// 2 = station expand
+		// 3
+		// 4 = cnv status retired / all to old
+		// 5 = electrified
+		// 6 and pl 3
 		local print_message_box = 0
 
+		local wt = line.get_waytype()
+
 		dbgprint("Check line " + line.get_name())
-		if ( our_player.nr == 3 && print_message_box > 0 ) {
+		if ( our_player.nr == 3 && print_message_box == 6 ) {
 			gui.add_message_at(our_player, "Check line " + line.get_name(), world.get_time())
 		}
 
 		local line_new = 0
+		local bilanz_year = 0
 		if ( line.get_owner().nr == our_player.nr ) {
 			// non profit in 5 months then destroy line //cnv.get_distance_traveled_total() > 3 &&
 			local profit_count = line.get_profit()
 			//if ( cnv.get_distance_traveled_total() < 3 ) { return }
-			if ( (profit_count[4] < 0 || profit_count[4] == 0) && profit_count[3] == 0 && profit_count[2] == 0 && profit_count[1] == 0 && profit_count[0] == 0 ) {
-				if ( line.destroy_line_month != world.get_time().month && check_factory_links(link.f_src, link.f_dest, link.freight.get_name()) > 1 ) {//line.get_traveled_distance() > 1 && line.get_traveled_distance() < 25 && line.get_loading_level() == 0 &&
+			local month_check = 0
+			for ( local i = 0; i < 12; i++ ) {
+				bilanz_year += profit_count[i]
+				if ( our_player.nr == 3 && print_message_box == 6 ) {
+					//gui.add_message_at(our_player, "bilanz_year += profit_count["+i+"] " + bilanz_year, world.get_time())
+				}
+				if ( i >= 4 ) {
+					month_check += profit_count[i]
+				}
+			}
+
+			if ( bilanz_year < 0 ) {
+				//gui.add_message_at(our_player, "Check line " + line.get_name(), world.get_time())
+				//gui.add_message_at(our_player, "bilanz_year " + bilanz_year, world.get_time())
+				//gui.add_message_at(our_player, "month_check " + month_check, world.get_time())
+				//::debug.pause()
+			}
+
+
+			if ( profit_count[4] <= 0 && profit_count[3] <= 0 && profit_count[2] <= 0 && profit_count[1] <= 0 && profit_count[0] <= 0 && month_check != 0) {
+				//line.get_traveled_distance() > 1 && line.get_traveled_distance() < 25 && line.get_loading_level() == 0 &&
+				local chk_f_link = check_factory_links(link.f_src, link.f_dest, link.freight.get_name())
+						/*if ( bilanz_year < 0 ) {
+							gui.add_message_at(our_player, "line 456 : chk_f_link " + chk_f_link, world.get_time())
+						}*/
+				if ( line.destroy_line_month != world.get_time().month && (chk_f_link > 1 || (chk_f_link == 1 && link.f_src.get_suppliers().len() == 0 && link.f_dest.get_consumers().len() == 0) || bilanz_year <= 0) ) {
 					local erreg = destroy_line(line, link.freight)
 					if ( erreg == false ) {
 						line.destroy_line_month = world.get_time().month
@@ -454,6 +463,43 @@ class industry_manager_t extends manager_t
 						link.state = 4
 						return
 					}
+
+
+					// line not complete
+					local entries = line.get_schedule().entries
+					local start_l = null
+					local end_l = null
+					if ( wt == wt_water ) {
+						if ( entries.len() >= 2 ) {
+							local start_h = entries[0].get_halt(our_player)
+							local end_h = entries[entries.len()-1].get_halt(our_player)
+							local t = start_h.get_tile_list()
+							start_l = tile_x(t[0].x, t[0].y, t[0].z)
+							t = end_h.get_tile_list()
+							end_l = tile_x(t[0].x, t[0].y, t[0].z)
+						}
+					} else {
+						if ( entries.len() >= 2 ) {
+							start_l = tile_x(entries[0].x, entries[0].y, entries[0].z)
+							end_l = tile_x(entries[entries.len()-1].x, entries[entries.len()-1].y, entries[entries.len()-1].z)
+						}
+					}
+					if ( test_halt_waytypes(end_l) == 1 && end_l.get_halt().get_factory_list().len() == 0 ) {
+						local erreg = destroy_line(line, link.freight)
+						/*if ( bilanz_year < 0 ) {
+							gui.add_message_at(our_player, "line 490 : erreg = destroy_line " + erreg, world.get_time())
+						}*/
+						if ( erreg == false ) {
+							line.destroy_line_month = world.get_time().month
+						} else if ( erreg == true ) {
+							link.state = 4
+							return
+						}
+					}
+
+
+
+
 				} else {
 					//gui.add_message_at(our_player, "return cnv/line new " + line.get_name(), world.get_time())
 				}
@@ -461,6 +507,10 @@ class industry_manager_t extends manager_t
 			}
 		}
 
+			/*if ( bilanz_year < 0 ) {
+				gui.add_message_at(our_player, " line 511 ", world.get_time())
+				//::debug.pause()
+			}*/
 
 		// find convoy
 		local cnv = null
@@ -470,14 +520,25 @@ class industry_manager_t extends manager_t
 		local new_cnv_add_line = false
 		local stucked_cnv = []
 		{
-			local list = line.get_convoy_list()
-			cnv_count = list.get_count()
-			if (cnv_count == 0) {
+			local list = []
+			// remove withdrawn convois
+			foreach(cnv in line.get_convoy_list()) {
+				if (cnv.is_valid() && !cnv.is_withdrawn()) {
+					list.append(cnv);
+				}
+			}
+
+			cnv_count = list.len()
+			if (cnv_count == 0 || ( bilanz_year == 0 && cnv_count == 1 )) {
 				// 0 convoy destroy line
+				// 1 convoy and profit year 0
 				if ( line.get_owner().nr == our_player.nr ) {
 					destroy_line(line, link.freight)
 					sleep()
 				}
+				/*if ( bilanz_year < 0 ) {
+					gui.add_message_at(our_player, "line 536 : destroy_line ", world.get_time())
+				}*/
 				return
 			}
 			for ( local i = 0; i < cnv_count; i++ ) {
@@ -486,10 +547,14 @@ class industry_manager_t extends manager_t
 				}
 				// stucked road vehicles destroy
 				local d = list[i].get_traveled_distance()
-				if ( list[i].get_distance_traveled_total() > 0 && d[0] == 0 && d[1] == 0 && list[i].is_loading() == false && list[i].get_waytype() == wt_road && cnv_count > 1 && list[i].get_loading_level() == 0) {
-					//gui.add_message_at(our_player, "####### destroy stucked road vehicles " + cnv_count, world.get_time())
+				if ( list[i].get_distance_traveled_total() > 0 && d[0] == 0 && d[1] == 0 && list[i].is_loading() == false && cnv_count > 1 && list[i].get_loading_level() == 0) {
+					//gui.add_message_at(our_player, "####### destroy stucked road vehicles " + cnv_count, world.get_time())list[i].get_waytype() == wt_road &&
 					stucked_cnv.append(list[i])
 					//remove_cnv++
+				}
+				// destroy convoys in depots
+				if ( list[i].is_in_depot() ) {
+					stucked_cnv.append(list[i])
 				}
 			}
 
@@ -501,8 +566,8 @@ class industry_manager_t extends manager_t
 					stucked_cnv[i].destroy(our_player)
 				}
 				sleep()
-				list = line.get_convoy_list()
-				cnv_count = list.get_count()
+				line.next_vehicle_check = world.get_time().ticks + (world.get_time().ticks_per_month * 3)
+				return
 			}
 
 			if ( line_new == 1 ) { return }
@@ -513,9 +578,9 @@ class industry_manager_t extends manager_t
 
 			// check cnv is retired first cnv
 			if ( list[0].has_obsolete_vehicles() && !list[0].is_withdrawn() ) {
-			  if ( print_message_box == 4 ) {
-				  gui.add_message_at(our_player, " retired convoy " + list[0].get_name(), world.get_time())
-        }
+				if ( print_message_box == 4 ) {
+					gui.add_message_at(our_player, " retired convoy " + list[0].get_name(), world.get_time())
+				}
 				cnv_retired.append(list[0])
 			}
 
@@ -525,7 +590,7 @@ class industry_manager_t extends manager_t
 				new_cnv_add_line = true
 				//gui.add_message_at(our_player, "####### cnv new this month ", world.get_time())
 			}
- 			//&& !new_cnv_add_line
+			//&& !new_cnv_add_line
 
 			local speed_count = 1
 			for ( local i = 1; i < cnv_count; i++ ) {
@@ -538,15 +603,15 @@ class industry_manager_t extends manager_t
 				}
 				// check cnv is retired all cnv
 				if ( list[i].has_obsolete_vehicles() && !list[i].is_withdrawn() ) {
-			    if ( print_message_box == 4 ) {
-					  gui.add_message_at(our_player, " retired convoy " + list[i].get_name(), world.get_time())
-          }
+					if ( print_message_box == 4 ) {
+						gui.add_message_at(our_player, " retired convoy " + list[i].get_name(), world.get_time())
+					}
 					cnv_retired.append(list[i])
 				}
 			}
 			//gui.add_message_at(our_player, " max speed " + cnv_max_speed, world.get_time())
 
-			if ( speed_count < cnv_count ) {
+			if ( speed_count < cnv_count && wt != wt_rail ) {
 				// update convoys - retire slower convoys
 				local k = 0
 				for ( local i = 0; i < cnv_count; i++ ) {
@@ -564,9 +629,9 @@ class industry_manager_t extends manager_t
 				}
 			} else if ( cnv_count == cnv_retired.len() ) {
 				// all cnv retired
-			  if ( print_message_box > 0 ) {
-          gui.add_message_at(our_player, " all convoys to old -> upgrade_link_line", world.get_time())
-        }
+				if ( print_message_box == 4 ) {
+					gui.add_message_at(our_player, " all convoys to old -> upgrade_link_line", world.get_time())
+				}
 				upgrade_link_line(link, line, cnv_max_speed)
 				return
 			}
@@ -598,6 +663,10 @@ class industry_manager_t extends manager_t
 			}
 		}
 
+			/*if ( bilanz_year < 0 ) {
+				gui.add_message_at(our_player, " line 667 ", world.get_time())
+				//::debug.pause()
+			}*/
 
 		sleep()
 		if ( cnv == null || !cnv.is_valid() ) { return }
@@ -605,7 +674,7 @@ class industry_manager_t extends manager_t
 		// find route
 		local nexttile = []
 		local nexttile_r = []
-		if (cnv.get_waytype() != wt_water && cnv.get_waytype() != wt_air) {
+		if (wt != wt_water && wt != wt_air) {
 			local entries = cnv.get_schedule().entries
 			local start = null
 			local end = null
@@ -616,7 +685,7 @@ class industry_manager_t extends manager_t
 
 
 
-			local asf = astar_route_finder(cnv.get_waytype())
+			local asf = astar_route_finder(wt)
 			local result = asf.search_route([start], [end])
 			// result is contains routes-array or error message
 			// route is backward from end to start
@@ -637,7 +706,7 @@ class industry_manager_t extends manager_t
 				sleep()
 			}
 
-			if ( cnv.get_waytype() == wt_rail && line.double_ways_build > 0 ) {
+			if ( wt == wt_rail && line.double_ways_build > 0 ) {
 				// return way for upgrade double ways
 				result = asf.search_route([end], [start])
 				if ("err" in result) {
@@ -653,27 +722,40 @@ class industry_manager_t extends manager_t
 			}
 		}
 
+			/*if ( bilanz_year < 0 ) {
+				gui.add_message_at(our_player, " line 726 ", world.get_time())
+				//::debug.pause()
+			}*/
 
-		if (our_player.get_current_cash() > 50000 && cnv.get_waytype() != wt_water && cnv.get_waytype() != wt_air) {
+		if (our_player.get_current_cash() > 50000 && wt != wt_water && wt != wt_air) {
 			if ( line.optimize_way_line == 0 ) {
 				// optimize way line befor build double ways
-				local err = optimize_way_line(nexttile, cnv.get_waytype())
-        if ( err ) {
-				  line.optimize_way_line = 1
-        }
+				local err = optimize_way_line(nexttile, wt)
+				if ( err ) {
+					line.optimize_way_line = 1
+				}
 			} else if ( line.optimize_way_line == 1 && our_player.get_current_cash() > 500000 ) {
-				local err = optimize_way_line(nexttile, cnv.get_waytype())
-        if ( err ) {
-				  line.optimize_way_line = 2
-        }
+				local err = optimize_way_line(nexttile, wt)
+				if ( err ) {
+					line.optimize_way_line = 2
+				}
 			} else if ( line.optimize_way_line == 2 && our_player.get_current_cash() > 1000000 ) {
-				local err = optimize_way_line(nexttile, cnv.get_waytype())
-        if ( err ) {
-				  line.optimize_way_line = 3
-        }
+				local err = optimize_way_line(nexttile, wt)
+				if ( err ) {
+					line.optimize_way_line = 3
+				}
+			} else if ( line.optimize_way_line == 3 && our_player.get_current_cash() > 1000000 && world.get_time().year >= 1950 ) {
+				local err = optimize_way_line(nexttile, wt)
+				if ( err ) {
+					line.optimize_way_line = 4
+				}
 			}
 		}
 
+			/*if ( bilanz_year < 0 ) {
+				gui.add_message_at(our_player, " line 756 ", world.get_time())
+				//::debug.pause()
+			}*/
 		// way speed
 		//gui.add_message_at(our_player, " -##- " + link.line_way_speed + " old speed save line " + line.get_name(), world.get_time())
 		//gui.add_message_at(our_player, " cnv max speed " + cnv_max_speed, world.get_time())
@@ -685,7 +767,7 @@ class industry_manager_t extends manager_t
 				local tile = tile_x(nexttile[i].x, nexttile[i].y, nexttile[i].z)
 				local tile_way = tile.find_object(mo_way)
 
-				if ( (tile_way.get_owner().nr == our_player_nr || tile_way.get_owner().nr == 1) && ( !tile.has_two_ways() && !tile.is_bridge() ) ) {
+				if ( tile_way != null && (tile_way.get_owner().nr == our_player_nr || tile_way.get_owner().nr == 1) && ( !tile.has_two_ways() && !tile.is_bridge() ) ) {
 					upgrade_tiles++
 					if ( tile_way.get_desc().get_topspeed() < way_speed ) {
 						way_speed = tile_way.get_desc().get_topspeed()
@@ -696,7 +778,7 @@ class industry_manager_t extends manager_t
 				}
 			}
 			// check double ways by rail
-			if ( cnv.get_waytype() == wt_rail && line.double_ways_build > 0 ) {
+			if ( wt == wt_rail && line.double_ways_build > 0 ) {
 				for ( local i = 0; i < nexttile_r.len(); i++ ) {
 					local tile = tile_x(nexttile_r[i].x, nexttile_r[i].y, nexttile_r[i].z)
 					local tile_way = tile.find_object(mo_way)
@@ -715,29 +797,32 @@ class industry_manager_t extends manager_t
 			//gui.add_message_at(our_player, " cnv max speed " + cnv_max_speed, world.get_time())
 
 			// upgrade way
-			local way_obj = find_object("way", cnv.get_waytype(), cnv_max_speed)
+			local way_obj = find_object("way", wt, cnv_max_speed)
 			//gui.add_message_at(our_player, " way max speed new " + way_obj.get_topspeed(), world.get_time())
 
 			if ( cnv_max_speed >= way_speed && upgrade_tiles > 2 ) {
 				local costs = (upgrade_tiles*(way_obj.get_cost()/100))
-				if ( cnv.get_waytype() == wt_rail && line.double_ways_build > 0 ) {
+				local count_build = 0
+				if ( wt == wt_rail && line.double_ways_build > 0 ) {
 					costs += line.double_ways_count*8*(way_obj.get_cost()/100)
 				}
 				if ( our_player.get_current_cash() > costs ) {
 					for ( local i = 1; i < nexttile.len(); i++ ) {
 						local tile_way_1 = tile_x(nexttile[i-1].x, nexttile[i-1].y, nexttile[i-1].z)
 						local tile_way_2 = tile_x(nexttile[i].x, nexttile[i].y, nexttile[i].z)
-						if ( (tile_way_2.find_object(mo_way).get_owner().nr == our_player_nr || tile_way_2.find_object(mo_way).get_owner().nr == 1) && tile_way_2.find_object(mo_way).get_desc().get_topspeed() < way_obj.get_topspeed() ) {
+						if ( tile_way_2.find_object(mo_way) != null && (tile_way_2.find_object(mo_way).get_owner().nr == our_player_nr || tile_way_2.find_object(mo_way).get_owner().nr == 1) && tile_way_2.find_object(mo_way).get_desc().get_topspeed() < way_obj.get_topspeed() ) {
 							command_x.build_way(our_player, tile_way_1, tile_way_2, way_obj, true)
+							count_build++
 						}
 					}
-					// built double ways by rail
-					if ( cnv.get_waytype() == wt_rail && line.double_ways_build > 0 ) {
+					// build double ways by rail
+					if ( wt == wt_rail && line.double_ways_build > 0 ) {
 						for ( local i = 1; i < nexttile_r.len(); i++ ) {
 							local tile_way_1 = tile_x(nexttile_r[i-1].x, nexttile_r[i-1].y, nexttile_r[i-1].z)
 							local tile_way_2 = tile_x(nexttile_r[i].x, nexttile_r[i].y, nexttile_r[i].z)
-							if ( (tile_way_2.find_object(mo_way).get_owner().nr == our_player_nr || tile_way_2.find_object(mo_way).get_owner().nr == 1) && tile_way_2.find_object(mo_way).get_desc().get_topspeed() < way_obj.get_topspeed() ) {
+							if ( tile_way_2.find_object(mo_way) != null && (tile_way_2.find_object(mo_way).get_owner().nr == our_player_nr || tile_way_2.find_object(mo_way).get_owner().nr == 1) && tile_way_2.find_object(mo_way).get_desc().get_topspeed() < way_obj.get_topspeed() ) {
 								command_x.build_way(our_player, tile_way_1, tile_way_2, way_obj, true)
+								count_build++
 							}
 						}
 					}
@@ -746,9 +831,11 @@ class industry_manager_t extends manager_t
 				local start_l = nexttile[nexttile.len()-1]
 				local end_l = nexttile[0]
 
-				local msgtext = format(translate("%s extends the route from %s (%s) to %s (%s)"), our_player.get_name(), start_l.get_halt().get_name(), coord_to_string(start_l), end_l.get_halt().get_name(), coord_to_string(end_l))
-				gui.add_message_at(our_player, msgtext, start_l)
-				//gui.add_message_at(our_player, " upgrade way ", world.get_time())
+				if (count_build > 0 ) {
+					local msgtext = format(translate("%s extends the route from %s (%s) to %s (%s)"), our_player.get_name(), start_l.get_halt().get_name(), coord_to_string(start_l), end_l.get_halt().get_name(), coord_to_string(end_l))
+					gui.add_message_at(our_player, msgtext, start_l)
+					//gui.add_message_at(our_player, " upgrade way ", world.get_time())
+				}
 
 				line.line_way_speed = way_obj.get_topspeed()
 			} else {
@@ -757,6 +844,11 @@ class industry_manager_t extends manager_t
 			}
 
 		}
+
+			/*if ( bilanz_year < 0 ) {
+				gui.add_message_at(our_player, " line 849 ", world.get_time())
+				//::debug.pause()
+			}*/
 
 		if (cnv.is_valid() && cnv.is_withdrawn()) {
 			// come back later
@@ -767,7 +859,7 @@ class industry_manager_t extends manager_t
 		}
 
 		// try to upgrade
-/*		if (cnv.has_obsolete_vehicles() &&  link.next_check < world.get_time().ticks) {
+/*    if (cnv.has_obsolete_vehicles() &&  link.next_check < world.get_time().ticks) {
 			link.next_check = today_plus_months(1)
 			if (upgrade_link_line(link, line)) {
 				// update successful
@@ -780,7 +872,7 @@ class industry_manager_t extends manager_t
 		// capacity of convoy
 		local capacity = 0
 		{
- 			//local lf = link.freight
+			//local lf = link.freight
 			foreach(v in cnv.get_vehicles()) {
 				local f = v.get_freight()
 				if (lf.is_interchangeable(f)) {
@@ -796,7 +888,7 @@ class industry_manager_t extends manager_t
 		local start_l = null
 		local end_l = null
 		{
-			local entries = cnv.get_schedule().entries
+			local entries = line.get_schedule().entries
 			if ( entries.len() >= 2 ) {
 				start_l = tile_x(entries[0].x, entries[0].y, entries[0].z)
 				end_l = tile_x(entries[entries.len()-1].x, entries[entries.len()-1].y, entries[entries.len()-1].z)
@@ -831,6 +923,11 @@ class industry_manager_t extends manager_t
 		}
 
 
+			/*if ( bilanz_year < 0 ) {
+				gui.add_message_at(our_player, " line 927 ", world.get_time())
+				//::debug.pause()
+			}*/
+
 		// calc gain per month of one convoy
 		local gain_per_m = 0
 		{
@@ -848,9 +945,19 @@ class industry_manager_t extends manager_t
 		//local remove_cnv = 0
 		{
 			local list = line.get_convoy_list()
+			//local halt_len = line.halt_length
+			local first_cnv = null
 			local message_show = 0
 			foreach(c in list)
 			{
+				if (!c.is_valid()  ||  c.is_withdrawn()) {
+					// will be withdrawn, ignore it
+					continue
+				}
+
+				if ( first_cnv == null ) {
+					first_cnv = c
+				}
 				// convoy empty?
 				local is_empty = c.get_loading_level() == 0
 				// convoy new? less than 2 months old, and not much transported
@@ -885,7 +992,12 @@ class industry_manager_t extends manager_t
 				}
 
 				if (is_empty  &&  is_stopped  &&  cnv_empty_stopped==null) {
-					cnv_empty_stopped = c
+					//gui.add_message_at(our_player, "### list.len() " + list.get_count() + " ### first_cnv.get_tile_length() " + first_cnv.get_tile_length() + " ### c.get_tile_length() " + c.get_tile_length(), world.get_time())
+					if ( list.get_count() == 2 && first_cnv.get_tile_length() < c.get_tile_length() ) {
+						first_cnv.toggle_withdraw(our_player)
+					} else {
+						cnv_empty_stopped = c
+					}
 				}
 				/*
 				// stucked road vehicles destroy
@@ -898,21 +1010,25 @@ class industry_manager_t extends manager_t
 				}*/
 			}
 
-			if ( message_show > 0 ) {
+			/*if ( message_show > 0 ) {
 				local msgtext = format(translate("%s removes convoys from line: %s"), our_player.get_name(), line.get_name())
 				gui.add_message_at(our_player, msgtext, world.get_time())
 				return true
-			}
+			}*/
 
 		}
 		dbgprint("Line:  loading = " + cc_load + ", stopped = " + cc_stop + ", new = " + cc_new + ", empty = " + cc_empty)
 		dbgprint("")
 
-		if ( print_message_box > 0 ) {
+		if ( print_message_box == 1 ) {
 			gui.add_message_at(our_player, "freight_available " + freight_available + " cc_new " + cc_new + " cc_stop " + cc_stop + " cnv.is_valid() " + cnv.is_valid(), world.get_time())
 		}
-		if (freight_available  &&  cc_new == 0  &&  cc_stop < 2 && cnv.is_valid() ) {
+		if ( (freight_available  &&  cc_new == 0  &&  cc_stop < 2 && cnv.is_valid()) || bilanz_year < 0 ) {
 
+			if ( bilanz_year < 0 ) {
+				//gui.add_message_at(our_player, " line 1029 ", world.get_time())
+				//::debug.pause()
+			}
 			// stations distance
 			local l = abs(start_l.x - end_l.x) + abs(start_l.y - end_l.y)
 			local c = 0
@@ -921,9 +1037,9 @@ class industry_manager_t extends manager_t
 			//gui.add_message_at(our_player, "#### way len " + l + " / 80 = " + (l / 80), world.get_time())
 			if ( l > 50 && l <= 90 ) {
 				c = 1
-			}	else if ( l > 90 && l <= 160 ) {
+			} else if ( l > 90 && l <= 160 ) {
 				c = 2
-			}	else if ( l > 160 && l <= 220 ) {
+			} else if ( l > 160 && l <= 220 ) {
 				c = 3
 			} else if ( l > 220 && l <= 350 ) {
 				c = 4
@@ -935,21 +1051,22 @@ class industry_manager_t extends manager_t
 
 
 			// no signals and double tracks - limit 1 convoy for rail
-			if (cnv.get_waytype() == wt_rail && cnv_count == 1 && c > 0 && line.double_ways_build == 0 ) {
+			if (wt == wt_rail && cnv_count == 1 && c > 0 && line.double_ways_build == 0 ) {
 				if ( print_message_box == 1 ) {
 					gui.add_message_at(our_player, "####### cnv.get_waytype() " + cnv.get_waytype() + " cnv.name " + cnv.get_name(), world.get_time())
 					gui.add_message_at(our_player, "####### lenght " + l + " double ways " + c, world.get_time())
 				}
 				//
 				// check way for find fields for double track
-				local s_fields = check_way_line(start_l, end_l, cnv.get_waytype(), l, c)
+				optimize_way_line(nexttile, wt)
+				local s_fields = check_way_line(start_l, end_l, wt, l, c)
 				local cc = 1
 
 				//gui.add_message_at(our_player, "####### type(s_fields) " + type(s_fields), world.get_time())
 				if ( type(s_fields) == "array" ) {
 					//gui.add_message_at(our_player, "####### s_fields.len() " + s_fields.len(), world.get_time())
 					if ( s_fields.len() == 0 ) {
-						s_fields = check_way_line(end_l, start_l, cnv.get_waytype(), l, c)
+						s_fields = check_way_line(end_l, start_l, wt, l, c)
 					}
 				}
 
@@ -960,7 +1077,7 @@ class industry_manager_t extends manager_t
 				 */
 				local build_double_ways = false
 				if ( s_fields != true && c > 0 && s_fields.len() > 0 ) {
-					local obj_sign = find_signal("is_signal", cnv.get_waytype())
+					local obj_sign = find_signal("is_signal", wt)
 					local way_obj = s_fields[0].find_object(mo_way).get_desc()
 
 					local build_cost = s_fields.len()*(obj_sign.get_cost()*2)
@@ -1014,21 +1131,28 @@ class industry_manager_t extends manager_t
 				} else {
 					return
 				}
-			} else if (cnv.get_waytype() == wt_rail && (cnv_count > c || c == 0) ) {
+			} else if (wt == wt_rail && (cnv_count > c || c == 0) ) {
 				return null
 			}
 
 			cnv_count = line.double_ways_count + 1
 
-			if (gain_per_m > 0 && line.next_vehicle_check < world.get_time().ticks ) {
+			if ( bilanz_year < 0 ) {
+				//gui.add_message_at(our_player, " line 1141 ", world.get_time())
+				//gui.add_message_at(our_player, " gain_per_m " + gain_per_m, world.get_time())
+				//::debug.pause()
+			}
+
+			if ( (gain_per_m > 0 || bilanz_year < 0 ) && line.next_vehicle_check < world.get_time().ticks ) {
 				// directly append
 				// TODO put into report
+			if ( bilanz_year < 0 ) {
+				gui.add_message_at(our_player, " line 1144 ", world.get_time())
+				//::debug.pause()
+			}
 				local proto = cnv_proto_t.from_convoy(cnv, lf)
-				local wt = cnv.get_schedule().waytype
 
-				local wt = cnv.get_waytype()
-
-				if ( print_message_box >= 1 ) {
+				if ( print_message_box == 1 ) {
 					gui.add_message_at(our_player, "###---- check convoys line : " + line.get_name(), world.get_time())
 				}
 
@@ -1048,18 +1172,56 @@ class industry_manager_t extends manager_t
 
 				local expand_station = []
 				local station_count = 0
+				local station_exist = 0
+
+				local expand_station_end_src = []
+				local expand_station_end_dest = []
+
 				if ( wt == wt_rail ) {
+					// count exist station lenght
 					for ( local i = 0; i < 6; i++ ) {
-						if ( nexttile[i].find_object(mo_building) ) {
+						if ( nexttile[i].find_object(mo_building) != null ) {
 							station_count++
 						}
 					}
+					// check expand station -> tiles direction end from way
+					local tiles_end_src = []
+					local tiles_end_dest = []
+					local t = null
+					// line end dest
+					for ( local i = 1; i < 4; i++ ) {
+						t = check_tile_end_of_station(nexttile[0].get_way_dirs(wt), i, nexttile[0])
+						if ( t != null ) {
+							if ( print_message_box == 2 ) {
+								gui.add_message_at(our_player, "###---- check tile expand_station_end_dest : " + coord3d_to_string(t), t)
+							}
+							expand_station_end_dest.append(t)
+						} else {
+							break
+						}
+					}
+					// line end src
+					for ( local i = 1; i < 4; i++ ) {
+						t = check_tile_end_of_station(nexttile[nexttile.len()-1].get_way_dirs(wt), i, nexttile[nexttile.len()-1])
+						if ( t != null ) {
+							if ( print_message_box == 2 ) {
+								gui.add_message_at(our_player, "###---- check tile expand_station_end_src : " + coord3d_to_string(t), t)
+							}
+							expand_station_end_src.append(t)
+						} else {
+							break
+						}
+					}
+
 					//prototyper.max_length = station_count
-          line.halt_length = station_count
-					local a = station_count
+					line.halt_length = station_count
+					station_exist = station_count
+					local add_tile_src = 0
+					local add_tile_dest = 0
 					if ( station_count < 6 ) {
-						// check expand station
+						// check expand station -> direction of the existing route/way
 						// built cnv to new length end expand station befor create cnv
+						//station_count++
 						for ( station_count; station_count < 6; station_count++ ) {
 							//gui.add_message_at(our_player, "###---- nexttile[station_count-1] : " + coord3d_to_string(nexttile[station_count-1]) + " - " + nexttile[station_count-1].get_way_dirs(wt), nexttile[0])
 							//gui.add_message_at(our_player, "###---- nexttile[station_count] : " + coord3d_to_string(nexttile[station_count]) + " - " + nexttile[station_count].get_way_dirs(wt), nexttile[0])
@@ -1070,22 +1232,105 @@ class industry_manager_t extends manager_t
 									(nexttile[station_count].is_bridge() && nexttile[station_count].z == square_x(nexttile[station_count].x, nexttile[station_count].y).get_ground_tile().z) ||
 									(nexttile[nexttile.len()-station_count-1].is_bridge() && nexttile[nexttile.len()-station_count-1].z == square_x(nexttile[station_count].x, nexttile[nexttile.len()-station_count-1].y).get_ground_tile().z) ) {
 							*/
-							if ( !test_field(our_player, nexttile[station_count], wt, nexttile[station_count-1].get_way_dirs(wt), square_x(nexttile[station_count].x, nexttile[station_count].y).get_ground_tile().z, 1) ) {
-								//station_count--
-								break
+							//if ( !test_field(our_player, nexttile[station_count], wt, nexttile[station_count].get_way_dirs(wt), square_x(nexttile[station_count].x, nexttile[station_count].y).get_ground_tile().z, 1) ) {
+							local t1 = nexttile[station_count]
+							local t2 = nexttile[(nexttile.len()-1)-station_count]
+							if ( (t1.get_way_dirs(wt) == 5 || t1.get_way_dirs(wt) == 10) && (t2.get_way_dirs(wt) == 5 || t2.get_way_dirs(wt) == 10) ) {
+								local check_tile = 0
+								local check_src = 0
+								local check_dest = 0
+								if ( print_message_box == 2 ) {
+									gui.add_message_at(our_player, "###---- check tile direction : " + coord3d_to_string(t1), t1)
+									gui.add_message_at(our_player, "###---- check tile direction : " + coord3d_to_string(t2), t2)
+								}
+								if ( (t1.z == nexttile[station_exist-1].z && !t1.is_bridge() && !t1.is_tunnel() && t1.get_slope() == 0 && !t1.has_two_ways()) || (t1.z < nexttile[station_exist-1].z && t1.is_bridge()) ) {
+									// dest
+									if ( print_message_box == 2 ) {
+										gui.add_message_at(our_player, "###---- check tile t1 z : " + t1.z, t1)
+										gui.add_message_at(our_player, "###---- check tile nexttile[station_exist-1].z (" + coord3d_to_string(nexttile[station_exist-1]) + ") : " + nexttile[station_exist-1].z, nexttile[station_exist-1])
+									}
+									check_tile++
+									check_src++
+								} else {
+									check_dest++
+								}
+
+								if ( (t2.z == nexttile[(nexttile.len()-1)-(station_exist-1)].z && !t2.is_bridge() && !t2.is_tunnel() && t2.get_slope() == 0 && !t2.has_two_ways()) || (t2.z < nexttile[(nexttile.len()-1)-(station_exist-1)].z && t2.is_bridge()) ) {
+									// src
+									if ( print_message_box == 2 ) {
+										gui.add_message_at(our_player, "###---- check tile t2 z : " + t2.z, t2)
+										gui.add_message_at(our_player, "###---- check tile nexttile[(nexttile.len()-1)-(station_exist-1)].z (" + coord3d_to_string(nexttile[(nexttile.len()-1)-(station_exist-1)]) + ") : " + nexttile[(nexttile.len()-1)-(station_exist-1)].z, nexttile[(nexttile.len()-1)-(station_exist-1)])
+									}
+									check_tile++
+									check_dest++
+								} else {
+									check_src++
+								}
+								if ( print_message_box == 2 ) {
+									gui.add_message_at(our_player, "###---- station_count-station_exist : " + (station_count-station_exist), world.get_time())
+									gui.add_message_at(our_player, "###---- check_tile: " + check_tile + " check_dest: " + check_dest + " check_src: " + check_src, world.get_time())
+									gui.add_message_at(our_player, "###---- add_tile_dest: " + add_tile_dest + " add_tile_src: " + add_tile_src, world.get_time())
+								}
+								if (check_tile == 2) {
+									if ( print_message_box == 2 ) {
+										gui.add_message_at(our_player, "###---- add tile nexttile[station_count]: " + coord3d_to_string(nexttile[station_count]), nexttile[station_count])
+										gui.add_message_at(our_player, "###---- add tile nexttile[nexttile.len()-(station_count+1)]: " + coord3d_to_string(nexttile[nexttile.len()-(station_count+1)]), nexttile[nexttile.len()-(station_count+1)])
+									}
+									expand_station.append(nexttile[station_count])
+									expand_station.append(nexttile[nexttile.len()-(station_count+1)])
+								} else if (check_tile == 1 && check_dest >= 1 && expand_station_end_dest.len()-1 >= add_tile_dest) {
+									// dest
+									if ( print_message_box == 2 ) {
+										gui.add_message_at(our_player, "###---- add tile expand_station_end_dest[add_tile_dest]: " + coord3d_to_string(expand_station_end_dest[add_tile_dest]), expand_station_end_dest[add_tile_dest])
+										gui.add_message_at(our_player, "###---- add tile nexttile[nexttile.len()-(station_count+1)]: " + coord3d_to_string(nexttile[nexttile.len()-(station_count+1)]), nexttile[nexttile.len()-(station_count+1)])
+									}
+									expand_station.append(expand_station_end_dest[add_tile_dest])
+									add_tile_dest++
+									expand_station.append(nexttile[nexttile.len()-(station_count+1)])
+								} else if (check_tile == 1 && check_src >= 1 && expand_station_end_src.len()-1 >= add_tile_src) {
+									// src
+									if ( print_message_box == 2 ) {
+										gui.add_message_at(our_player, "###---- add tile nexttile[station_count]: " + coord3d_to_string(nexttile[station_count]), nexttile[station_count])
+										gui.add_message_at(our_player, "###---- add tile expand_station_end_src[add_tile_src]: " + coord3d_to_string(expand_station_end_src[add_tile_src]), expand_station_end_src[add_tile_src])
+									}
+									expand_station.append(nexttile[station_count])
+									expand_station.append(expand_station_end_src[add_tile_src])
+									add_tile_src++
+								} else if (check_tile == 0 && check_src == 1 && check_dest == 1 && expand_station_end_dest.len()-1 >= add_tile_dest && expand_station_end_src.len()-1 >= add_tile_src) {
+									// src & dest
+									if ( print_message_box == 2 ) {
+										gui.add_message_at(our_player, "###---- add tile expand_station_end_dest[add_tile_dest]: " + coord3d_to_string(expand_station_end_dest[add_tile_dest]), expand_station_end_dest[add_tile_dest])
+										gui.add_message_at(our_player, "###---- add tile expand_station_end_src[add_tile_src]: " + coord3d_to_string(expand_station_end_src[add_tile_src]), expand_station_end_src[add_tile_src])
+									}
+									expand_station.append(expand_station_end_dest[add_tile_dest])
+									add_tile_dest++
+									expand_station.append(expand_station_end_src[add_tile_src])
+									add_tile_src++
+								} else {
+									station_count--
+									break
+								}
 							} else {
-								expand_station.append(nexttile[station_count])
-								expand_station.append(nexttile[nexttile.len()-station_count])
+								station_count--
+								break
 							}
 						}
-						if ( a < station_count && print_message_box > 0 ) {
-							gui.add_message_at(our_player, "###---- check stations field : " + a, nexttile[0])
-							gui.add_message_at(our_player, "###---- check stations field expand : " + station_count, nexttile[0])
+						if ( station_exist < station_count && print_message_box == 2 ) {
+							gui.add_message_at(our_player, "###---- check stations field : " + station_exist, nexttile[0])
+							gui.add_message_at(our_player, "###---- check stations field expand -> direction exist way : " + station_count, nexttile[0])
 						}
+
+
+
 					}
-					prototyper.max_length = station_count
 				} else {
 					prototyper.max_length = prototyper.max_vehicles * 8
+				}
+
+				if ( expand_station.len() > 0 ) {
+					prototyper.max_length = station_exist + (expand_station.len()/2)
+				} else {
+					prototyper.max_length = station_exist
 				}
 
 				if ( wt == wt_road && check_good_quantity(start_l, end_l, lf, line) ) {
@@ -1112,21 +1357,57 @@ class industry_manager_t extends manager_t
 				}
 
 				// through schedule to estimate distance
-				local dist = 0
-				local entries = cnv.get_schedule().entries
-				dist = abs(entries[0].x - entries[1].x) + abs(entries[0].y - entries[1].y)
+				//local dist = 0
+				//local entries = cnv.get_schedule().entries
+				// distance real route
+				local dist = nexttile.len() //abs(entries[0].x - entries[1].x) + abs(entries[0].y - entries[1].y)
 
 				if (wt == wt_road ) {
 					if ( dist <= 50) { cnv_valuator.max_cnvs = dist/3 }
 					else if ( dist > 50 && dist <= 250 ) { cnv_valuator.max_cnvs = dist/2 }
 					//else if ( dist > 250 ) { cnv_valuator.max_cnvs = dist - 50 }
-			    if ( print_message_box > 0 ) {
-					  gui.add_message_at(our_player, "### line : " + line.get_name() + " dist: " + dist + " cnv max: " + cnv_valuator.max_cnvs, world.get_time())
-          }
+					if ( print_message_box == 1 ) {
+						gui.add_message_at(our_player, "### line : " + line.get_name() + " dist: " + dist + " cnv max: " + cnv_valuator.max_cnvs, world.get_time())
+					}
 				}
 
 				// add 10% from distance
-				dist += dist / 100 * 10
+				//dist += dist / 100 * 10
+
+				if ( wt == wt_rail ) {
+					local catenary_obj = null //find_object("catenary", wt, 100)
+					local catenary_cost = 0
+					if ( start_l.find_object(mo_wayobj) != null ) {
+						catenary_obj = start_l.find_object(mo_wayobj).get_desc()
+						if ( catenary_obj != null && !catenary_obj.is_available(world.get_time()) && !catenary_obj.is_overhead_line() ) {
+							catenary_obj = find_object("catenary", wt, cnv_max_speed)
+						}
+
+						if ( print_message_box == 5 ) {
+							gui.add_message_at(our_player, "###---- set electrified convoys " + line.get_name(), world.get_time())
+							gui.add_message_at(our_player, "###---- line has catenary ", world.get_time())
+						}
+
+						prototyper.electrified = 1
+					} else {
+						catenary_obj = find_object("catenary", wt, cnv_max_speed)
+
+						// build cost
+						catenary_cost = (catenary_obj.get_cost() * (dist + (8 * line.double_ways_count))) + catenary_obj.get_cost()
+						// + maintenance for 5 months
+						catenary_cost += ((catenary_obj.get_maintenance() * (dist + (8 * line.double_ways_count))) + catenary_obj.get_maintenance()) * 5
+
+						// set electrified for vehicle by way len > xx tiles
+						if ( nexttile.len() > 80 && world.get_time().year >= 1935 && our_player.get_current_cash() > catenary_cost ) {
+							if ( print_message_box == 5 ) {
+								gui.add_message_at(our_player, "###---- set electrified convoys " + line.get_name(), world.get_time())
+								gui.add_message_at(our_player, "###---- line len " + nexttile.len(), world.get_time())
+							}
+							prototyper.electrified = 1
+						}
+					}
+
+				}
 
 				cnv_valuator.distance = dist
 
@@ -1176,7 +1457,7 @@ class industry_manager_t extends manager_t
 						way_tile[3] = tile_x(depot.x, depot.y+1, depot.z)
 						for ( local i = 0; i < 4; i++ ) {
 							if ( way_tile[i].find_object(mo_way) != null ) {
-								local way_obj = find_object("way", cnv.get_waytype(), cnv.get_speed())
+								local way_obj = find_object("way", wt, cnv.get_speed())
 								local depot_obj = building_desc_x.get_available_stations(building_desc_x.depot, wt, {})
 								local err = command_x.build_way(our_player, depot, way_tile[i], way_obj, true)
 								if ( err == null ) {
@@ -1193,8 +1474,8 @@ class industry_manager_t extends manager_t
 					//if ( wt = wt_road ) {
 						//local err = construct_road_to_depot(pl, c_route[i], planned_way) //c_start
 						//if (err) {
-						//	print("Failed to build depot access from " + coord_to_string(c_start))
-						//	return false
+						//  print("Failed to build depot access from " + coord_to_string(c_start))
+						//  return false
 						//}
 
 					//}
@@ -1223,6 +1504,7 @@ class industry_manager_t extends manager_t
 					gui.add_message_at(our_player, "Line: " + line.get_name() + " ==> build additional convoy", world.get_time())
 				}
 
+				//gui.add_message_at(our_player, "####### expand_station.len() " + expand_station.len(), expand_station[0])
 				if ( wt == wt_rail && expand_station.len() > 0 ) {
 					// tiles for convoy
 					local a = c.p_convoy.length
@@ -1236,27 +1518,123 @@ class industry_manager_t extends manager_t
 					//local k = c.p_convoy.get_tile_length()
 					local station_list = building_desc_x.get_available_stations(building_desc_x.station, wt_rail, good_desc_x(freight))
 
-					if ( st_lenght > station_count ) {
-						// expand station
-						for ( local i = 0; i < 2; i++ ) {
-							command_x.build_station(our_player, expand_station[i], station_list[0])
+					local station_s_obj = nexttile[nexttile.len()-1].find_object(mo_building).get_desc()
+					if ( !station_s_obj.is_available(world.get_time()) ) {
+						local capacity = station_s_obj.get_capacity()
+						station_s_obj = null
+						foreach(station in station_list) {
+							if ( station_s_obj == null ) {
+								station_s_obj = station
+							}
+							if ( station.get_capacity() >= capacity && station.get_capacity() < station_s_obj.get_capacity() ) {
+								station_s_obj = station
+							}
 						}
-            line.halt_length = st_lenght
-						gui.add_message_at(our_player, "####### expand stations ", expand_station[0])
+					}
+
+					local station_e_obj = nexttile[0].find_object(mo_building).get_desc()
+					if ( !station_e_obj.is_available(world.get_time()) ) {
+						station_e_obj = null
+						foreach(station in station_list) {
+							if ( station_e_obj == null ) {
+								station_e_obj = station
+							}
+							if ( station.cost < station_e_obj.cost ) {
+								station_e_obj = station
+							}
+						}
+					}
+
+					local way_obj = start_l.find_object(mo_way).get_desc() //way_list[0]
+					if ( !way_obj.is_available(world.get_time()) ) {
+						way_obj = find_object("way", wt, way_obj.get_topspeed())
+					}
+
+					//gui.add_message_at(our_player, "####### st_lenght > station_count : " + st_lenght + " > " + station_exist, expand_station[0])
+					if ( st_lenght > station_exist ) {
+						// expand station
+						for ( local i = 0; i <= (st_lenght - station_exist); i++ ) {
+							local station_obj = (i % 2) ? station_s_obj : station_e_obj
+							if ( expand_station[i].find_object(mo_way) == null ) {
+								local build_tile = (i % 2) ? start_l : end_l
+								if ( terraform_tile(expand_station[i], build_tile.z) ) {
+									command_x.build_way(our_player, build_tile, expand_station[i], way_obj, true)
+									command_x.build_station(our_player, expand_station[i], station_obj)
+									::debug.pause()
+									local entries = line.get_schedule().entries
+									if ( build_tile == start_l ) {
+										entries[0] = schedule_entry_x(build_tile, 100, 0)
+									} else {
+										entries[entries.len()-1] = schedule_entry_x(build_tile, 0, 0)
+									}
+
+								}
+								::debug.pause()
+							} else {
+								command_x.build_station(our_player, expand_station[i], station_obj)
+							}
+							//gui.add_message_at(our_player, "####### expand stations tile " + coord3d_to_string(expand_station[i]), expand_station[0])
+						}
+						line.halt_length = st_lenght
+						//gui.add_message_at(our_player, "####### expand stations ", expand_station[0])
+						local message_text = format(translate("%s expand the station %s (%s) and station %s (%s)"), our_player.get_name(), start_l.get_halt().get_name(), coord_to_string(start_l), end_l.get_halt().get_name(), coord_to_string(end_l))
+						gui.add_message_at(our_player, message_text, start_l)
 					} /*else if ( st_lenght == 5 && expand_station.len() > 2 ) {
 						// expand station to 5 tiles
 						for ( local i = 0; i < expand_station.len(); i++ ) {
 							command_x.build_station(our_player, expand_station[i], station_list[0])
 						}
-						gui.add_message_at(our_player, "####### expand stations ", expand_station[0])
 					}*/
+				}
+
+				if ( wt == wt_rail && proto.veh[0].needs_electrification() ) { //
+
+					local way_obj = start_l.find_object(mo_way).get_desc() //way_list[0]
+					if ( !way_obj.is_available(world.get_time()) ) {
+						way_obj = find_object("way", wt, way_obj.get_topspeed())
+					}
+
+					local catenary_obj = null //find_object("catenary", wt, 100)
+					local build_catenary = false
+					if ( start_l.find_object(mo_wayobj) != null ) {
+						catenary_obj = start_l.find_object(mo_wayobj).get_desc()
+						if ( catenary_obj != null && !catenary_obj.is_available(world.get_time()) && !catenary_obj.is_overhead_line() ) {
+							catenary_obj = find_object("catenary", wt, way_obj.get_topspeed())
+							build_catenary = true
+						}
+					} else {
+						catenary_obj = find_object("catenary", wt, way_obj.get_topspeed())
+						build_catenary = true
+					}
+
+					if ( build_catenary ) {
+						command_x.build_wayobj(our_player, start_l, end_l, catenary_obj)
+						command_x.build_wayobj(our_player, end_l, start_l, catenary_obj)
+						command_x.build_wayobj(our_player, depot, start_l, catenary_obj)
+
+						local msgtext = format(translate("%s electrified the line %s"), our_player.get_name(), line.get_name())
+						gui.add_message_at(our_player, msgtext, world.get_time())
+
+					}
+
+
+					if ( print_message_box == 5 ) {
+						//gui.add_message_at(our_player, "####### proto.veh[0].needs_electrification() : " + proto.veh[0].needs_electrification(), world.get_time())
+						gui.add_message_at(our_player, "####### cnv needs electrified " + catenary_obj.get_name(), depot)
+					}
+
+
 				}
 
 				local msgtext = format(translate("%s build additional convoy to line: %s"), our_player.get_name(), line.get_name())
 				gui.add_message_at(our_player, msgtext, world.get_time())
 
 				// save ticks for next check
-				line.next_vehicle_check = world.get_time().ticks + world.get_time().ticks_per_month
+				if ( wt == wt_rail ) {
+					line.next_vehicle_check = world.get_time().ticks + (world.get_time().ticks_per_month*2)
+				} else {
+					line.next_vehicle_check = world.get_time().ticks + world.get_time().ticks_per_month
+				}
 
 				return true
 			}
@@ -1286,7 +1664,11 @@ class industry_manager_t extends manager_t
 				gui.add_message_at(our_player, msgtext, world.get_time())
 
 				// save ticks for next check
-				line.next_vehicle_check = world.get_time().ticks + world.get_time().ticks_per_month
+				if ( wt == wt_rail ) {
+					line.next_vehicle_check = world.get_time().ticks + (world.get_time().ticks_per_month*2)
+				} else {
+					line.next_vehicle_check = world.get_time().ticks + world.get_time().ticks_per_month
+				}
 
 			}
 		}
@@ -1300,12 +1682,12 @@ class industry_manager_t extends manager_t
 	 */
 	function upgrade_link_line(link, line, cnv_speed)
 	{
-		local print_message_box = 1
+		local print_message_box = 0
 
 		if ( print_message_box > 0 ) {
-		  gui.add_message_at(our_player, "### upgrade_link_line " + line.get_name(), world.get_time())
-    }
-    //gui.add_message_at(our_player, "### cnv_speed " + cnv_speed, world.get_time())
+			gui.add_message_at(our_player, "### upgrade_link_line " + line.get_name(), world.get_time())
+		}
+		//gui.add_message_at(our_player, "### cnv_speed " + cnv_speed, world.get_time())
 		// find convoy
 		local cnv = null
 		{
@@ -1316,11 +1698,11 @@ class industry_manager_t extends manager_t
 			}
 			cnv = list[0]
 		}
-		local wt = cnv.get_waytype()
 		// estimate transport volume
 		local transported = line.get_transported_goods().reduce(max)
 
 		// plan convoy prototype
+		local wt = line.get_waytype()
 		local prototyper = prototyper_t(wt, link.freight.get_name())
 
 		// iterate through schedule to estimate distance
@@ -1343,7 +1725,7 @@ class industry_manager_t extends manager_t
 				dist = max(dist, abs(halts[i].x - halts[i-1].x) + abs(halts[i].y - halts[i-1].y) )
 			}
 
-      if (  wt == wt_rail && line.halt_length == 0 ) { line.halt_length = halts[1].get_halt(our_player).get_tile_list().len() }
+			if (  wt == wt_rail && line.halt_length == 0 ) { line.halt_length = halts[1].get_halt(our_player).get_tile_list().len() }
 		}
 
 		//local wt = wt
@@ -1359,11 +1741,11 @@ class industry_manager_t extends manager_t
 		prototyper.max_vehicles = get_max_convoi_length(wt)
 		prototyper.max_length = 1
 		if ( print_message_box > 0 ) {
-      gui.add_message_at(our_player, "### line.halt_length = " + line.halt_length, world.get_time())
-    }
-    if ( wt == wt_rail ) {
-      prototyper.max_length = line.halt_length
-    }
+			gui.add_message_at(our_player, "### line.halt_length = " + line.halt_length, world.get_time())
+		}
+		if ( wt == wt_rail ) {
+			prototyper.max_length = line.halt_length
+		}
 		if (wt == wt_water) {
 			prototyper.max_length = 4
 		}
@@ -1444,7 +1826,7 @@ class industry_manager_t extends manager_t
 }
 
 function convoy_max_speed(cnv) {
-	// convoy_x::calc_max_speed	(	integer power, integer weight, integer speed_limit )
+	// convoy_x::calc_max_speed ( integer power, integer weight, integer speed_limit )
 
 	local pwr = 0
 	local weight = 0
@@ -1483,7 +1865,7 @@ function convoy_is_retired(cnv) {
  */
 function check_good_quantity(start_l, end_l, good, line) {
 
-	local f_dest	= end_l.get_halt().get_factory_list()
+	local f_dest  = end_l.get_halt().get_factory_list()
 	if ( f_dest.len() == 1 ) {
 		local freight = good.get_name()
 		foreach(freight, islot in f_dest[0].input) {

@@ -43,6 +43,7 @@ static pthread_mutex_t add_to_city_mutex = PTHREAD_MUTEX_INITIALIZER;
 #include "../dataobj/translator.h"
 #include "../dataobj/settings.h"
 #include "../dataobj/environment.h"
+#include "../dataobj/pakset_manager.h"
 
 #include "../gui/obj_info.h"
 
@@ -82,7 +83,7 @@ gebaeude_t::gebaeude_t(loadsave_t *file) : obj_t()
 		set_yoff(0);
 	}
 	if(tile  &&  tile->get_phases()>1) {
-		welt->sync_eyecandy.add( this );
+		welt->sync_buildings.add( this );
 		sync = true;
 	}
 }
@@ -123,7 +124,7 @@ gebaeude_t::~gebaeude_t()
 
 	if(sync) {
 		sync = false;
-		welt->sync_eyecandy.remove(this);
+		welt->sync_buildings.remove(this);
 	}
 
 	// tiles might be invalid, if no description is found during loading
@@ -252,7 +253,7 @@ void gebaeude_t::set_tile( const building_tile_desc_t *new_tile, bool start_with
 #ifdef MULTI_THREAD
 			pthread_mutex_lock( &sync_mutex );
 #endif
-			welt->sync_eyecandy.remove(this);
+			welt->sync_buildings.remove(this);
 			sync = false;
 			anim_frame = 0;
 #ifdef MULTI_THREAD
@@ -267,7 +268,7 @@ void gebaeude_t::set_tile( const building_tile_desc_t *new_tile, bool start_with
 #endif
 		anim_frame = sim_async_rand( new_tile->get_phases() );
 		anim_time = 0;
-		welt->sync_eyecandy.add(this);
+		welt->sync_buildings.add(this);
 		sync = true;
 #ifdef MULTI_THREAD
 		pthread_mutex_unlock( &sync_mutex );
@@ -892,7 +893,7 @@ void gebaeude_t::rdwr(loadsave_t *file)
 
 					default:
 						dbg->warning("gebaeude_t::rwdr", "description %s for building at %d,%d not found (will be removed)!", buf, get_pos().x, get_pos().y);
-						welt->add_missing_paks( buf, karte_t::MISSING_BUILDING );
+						pakset_manager_t::add_missing_paks( buf, MISSING_BUILDING );
 				}
 			}
 		}

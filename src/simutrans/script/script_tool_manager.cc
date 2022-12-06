@@ -46,9 +46,9 @@ const scripted_tool_info_t* script_tool_manager_t::get_script_info(const char* p
 	if (  file.open(buf)  ) {
 		tabfileobj_t contents;
 		file.read( contents );
-		info->title    = contents.get_string("title", path);
+		info->title    = translator::translate(contents.get_string("title", path));
 		info->menu_arg = contents.get_string("menu", "");
-		info->tooltip  = contents.get_string("tooltip", "");
+		info->tooltip  = translator::translate(contents.get_string("tooltip", ""));
 		info->cursor_area = contents.get_koord("cursor_area", koord(1,1));
 		info->cursor_offset = contents.get_koord("cursor_offset", koord(0,0));
 		if(  info->cursor_area.x<1  ||  info->cursor_area.y<1  ) {
@@ -58,6 +58,7 @@ const scripted_tool_info_t* script_tool_manager_t::get_script_info(const char* p
 
 		const char* skin_name = contents.get_string("icon", "");
 		info->desc   = skinverwaltung_t::get_extra(skin_name, strlen(skin_name), skinverwaltung_t::cursor);
+		info->restart = contents.get_int("restart", false);
 		info->is_one_click = !( strcmp(contents.get_string("type", "one_click"), "two_click")==0 );
 	}
 	else {
@@ -98,7 +99,8 @@ tool_t* script_tool_manager_t::load_tool(char const* path, tool_t* tool)
 void script_tool_manager_t::load_scripts(char const* path)
 {
 	searchfolder_t find;
-	find.search(path, "", true, false);
+	find.search(path, "", searchfolder_t::SF_ONLYDIRS);
+
 	for(const char* const &name : find) {
 		cbuffer_t fullname;
 		fullname.printf("%s%s",path,name);

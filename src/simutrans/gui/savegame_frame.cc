@@ -159,9 +159,9 @@ void savegame_frame_t::add_section(std::string &name){
 	char *label_text = new char [L_SHORTENED_SIZE+prefix_len+2];
 	char *path_expanded = new char[FILENAME_MAX];
 
-	const size_t data_dir_len = strlen(env_t::data_dir);
+	const size_t data_dir_len = strlen(env_t::base_dir);
 
-	if(  name[0]=='/'  ||  name[0]=='\\'  ||  name[1]==':'  ||  strncmp(name.c_str(),env_t::data_dir,data_dir_len) == 0  ) {
+	if(  name[0]=='/'  ||  name[0]=='\\'  ||  name[1]==':'  ||  strncmp(name.c_str(),env_t::base_dir,data_dir_len) == 0  ) {
 		// starts with data_dir or an absolute path
 		tstrncpy(path_expanded, name.c_str(), FILENAME_MAX);
 	}
@@ -204,8 +204,8 @@ void savegame_frame_t::add_section(std::string &name){
  *
  * @param path  A nul terminated path to include in the search.
  */
-void savegame_frame_t::add_path(const char * path){
-
+void savegame_frame_t::add_path(const char * path)
+{
 	if (!this->searchpath_defined) {
 		sprintf(this->searchpath, "%s", path);
 		this->searchpath_defined = true;
@@ -239,7 +239,8 @@ void savegame_frame_t::fill_list( void )
 		const char *path_c      = path.c_str();
 		const size_t path_c_len = strlen(path_c);
 
-		sf.search(path, std::string(suffixnodot), this->only_directories, false);
+		const searchfolder_t::search_flags_t search_flags = this->only_directories ? searchfolder_t::SF_ONLYDIRS : searchfolder_t::SF_NONE;
+		sf.search(path, std::string(suffixnodot), search_flags, false);
 
 		bool section_added = false;
 
@@ -369,7 +370,7 @@ void savegame_frame_t::add_file(const char *fullpath, const char *filename, cons
 	button->set_no_translate(true);
 	button->set_text(name); // to avoid translation
 
-	std::string const compare_to = !env_t::objfilename.empty() ? env_t::objfilename.substr(0, env_t::objfilename.size() - 1) + " -" : std::string();
+	std::string const compare_to = !env_t::pak_name.empty() ? env_t::pak_name.substr(0, env_t::pak_name.size() - 1) + " -" : std::string();
 	// sort descending with respect to compare_items
 	slist_tpl<dir_entry_t>::iterator i = entries.begin();
 	slist_tpl<dir_entry_t>::iterator end = entries.end();
@@ -470,7 +471,7 @@ bool savegame_frame_t::infowin_event(const event_t *event)
  */
 bool savegame_frame_t::action_triggered(gui_action_creator_t *component, value_t )
 {
-	char buf[PATH_MAX];
+	char buf[PATH_MAX] = {};
 
 	if(component==&input  ||  component==&savebutton) {
 		// Save/Load Button or Enter-Key pressed
@@ -639,56 +640,6 @@ void savegame_frame_t::shorten_path(char *dest,const char *source,const size_t m
 	memcpy(&dest[half-1],"...",sizeof(char) * 3);
 	strcpy(&dest[half+2],&source[orig_size-half+2-odd]);
 
-}
-
-
-
-/**
- * Returns the path portion of a qualified filename including path.
- *
- * @param fullpath  A null terminated string with a full qualified file name.
- */
-std::string savegame_frame_t::get_basename(const char *fullpath)
-{
-	std::string path = fullpath;
-	size_t last = path.find_last_of("\\/");
-	if (last==std::string::npos){
-		return path;
-	}
-	return path.substr(0,last+1);
-}
-
-
-
-/**
- * Returns the file name without extension (optional) of a qualified filename
- * including path.
- *
- * @param fullpath            A nul terminated string with a full qualified file name.
- * @param with_extension  If true, the extension is removed from the filename.
- *
- * @retval std::string  The filename without extension.
- */
-std::string savegame_frame_t::get_filename(const char *fullpath,const bool with_extension)
-{
-	std::string path = fullpath;
-
-	// Remove until last \ or /
-
-	size_t last = path.find_last_of("\\/");
-	if (last!=std::string::npos) {
-		path = path.erase(0,last+1);
-	}
-
-	// Remove extension if it's present, will remove from '.' till the end.
-
-	if (!with_extension){
-		last = path.find_last_of(".");
-		if (last!=std::string::npos) {
-			path = path.erase(last);
-		}
-	}
-	return path;
 }
 
 

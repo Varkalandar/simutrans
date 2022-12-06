@@ -22,7 +22,6 @@
 #include "../dataobj/environment.h"
 #include "../dataobj/freelist.h"
 
-
 #include "groundobj.h"
 
 /******************************** static routines for desc management ****************************************************************/
@@ -58,7 +57,7 @@ bool groundobj_t::plant_groundobj_on_coordinate(koord pos, const groundobj_desc_
 		if(  gr->ist_natur()  &&  (!check_climate  ||  desc->is_allowed_climate( welt->get_climate(pos) ))  ) {
 			if(  gr->get_top() > 0  ) {
 				switch(gr->obj_bei(0)->get_typ()) {
-					case obj_t::wolke:
+					case obj_t::cloud:
 					case obj_t::air_vehicle:
 					case obj_t::leitung:
 					case obj_t::label:
@@ -119,8 +118,8 @@ bool groundobj_t::register_desc(groundobj_desc_t *desc)
 {
 	assert(desc->get_speed()==0);
 	// remove duplicates
-	if(  desc_table.remove( desc->get_name() )  ) {
-		dbg->doubled( "groundobj", desc->get_name() );
+	if(groundobj_desc_t *old = desc_table.remove( desc->get_name() )  ) {
+		delete old;
 	}
 	desc_table.put(desc->get_name(), desc );
 	return true;

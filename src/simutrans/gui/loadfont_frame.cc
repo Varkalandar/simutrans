@@ -16,6 +16,7 @@
 #include "../simversion.h"
 #include "../pathes.h"
 #include "../utils/unicode.h"
+#include "../utils/searchfolder.h"
 
 #include "../dataobj/loadsave.h"
 #include "../dataobj/translator.h"
@@ -31,11 +32,17 @@ uint8 loadfont_frame_t::old_linespace;
 
 bool loadfont_frame_t::use_unicode=false;
 
+bool loadfont_frame_t::is_resizable_font (const char *fontname) {
+	const char *start_extension = strrchr(fontname, '.' );
+	return start_extension  &&  STRICMP( start_extension, ".fnt" ) && STRICMP( start_extension, ".bdf" );
+}
+
 /**
  * Action that's started with a button click
  */
 bool loadfont_frame_t::item_action(const char *filename)
 {
+	fontsize.enable( is_resizable_font(filename) );
 	win_load_font(filename, env_t::fontsize);
 	return false;
 }
@@ -58,8 +65,6 @@ bool loadfont_frame_t::cancel_action(const char *)
 	return true;
 }
 
-
-
 loadfont_frame_t::loadfont_frame_t() : savegame_frame_t(NULL,false,NULL,false)
 {
 	// first call (and not resizing)
@@ -70,12 +75,17 @@ loadfont_frame_t::loadfont_frame_t() : savegame_frame_t(NULL,false,NULL,false)
 
 	set_name(translator::translate("Select display font"));
 
-	fnlabel.set_text( "font size" );
-
 	top_frame.remove_component(&input);
 	fontsize.init( env_t::fontsize, 6, 19, gui_numberinput_t::AUTOLINEAR, false );
 	fontsize.add_listener(this);
+	fontsize.enable( is_resizable_font(env_t::fontname.c_str()) );
+
+#ifdef USE_FREETYPE
+	fnlabel.set_text( "font size" );
 	top_frame.add_component(&fontsize);
+#else
+	top_frame.remove_component(&fnlabel);
+#endif
 
 	unicode_only.init( button_t::square_automatic, "Only full Unicode fonts");
 	unicode_only.pressed = use_unicode;
@@ -83,7 +93,6 @@ loadfont_frame_t::loadfont_frame_t() : savegame_frame_t(NULL,false,NULL,false)
 	top_frame.add_component(&unicode_only, 2);
 
 	delete_enabled = false;
-//	label_enabled  = false;
 }
 
 
@@ -176,7 +185,7 @@ bool loadfont_frame_t::check_file(const char *filename, const char *)
 // parses the directory, using freetype lib, in installed
 void loadfont_frame_t::fill_list()
 {
-	add_path( ((std::string)env_t::data_dir+"font/").c_str() );
+	add_path( ((std::string)env_t::base_dir+"font/").c_str() );
 #ifdef USE_FREETYPE
 	// ok, we can handle TTF fonts
 	ft_library = NULL;
@@ -185,8 +194,13 @@ void loadfont_frame_t::fill_list()
 	}
 	else {
 		const char *addpath;
+		searchfolder_t subfolders;
 		for(  int i=0;  ( addpath = dr_query_fontpath(i) );  i++  ) {
 			add_path( addpath );
+			subfolders.search(addpath, "", searchfolder_t::SF_ONLYDIRS | searchfolder_t::SF_PREPEND_PATH, 4);
+			for( const char * folder : subfolders ){
+				add_path( ((std::string) folder + PATH_SEPARATOR).c_str() );
+			}
 		}
 	}
 #endif
@@ -213,8 +227,10 @@ void loadfont_frame_t::fill_list()
 			FT_Face face;
 			if(  !FT_New_Face( ft_library, i.info, 0, &face )  ) {
 				delete [] const_cast<char*>(i.button->get_text());
-				char *name = new char[strlen(face->family_name)+1];
+				char *name = new char[strlen(face->family_name)+strlen(face->style_name)+2];
 				strcpy( name, face->family_name );
+				strcat( name, " ");
+				strcat( name, face->style_name );
 				i.button->set_text(name);
 				FT_Done_Face( face );
 			}

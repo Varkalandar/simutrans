@@ -67,9 +67,6 @@ obj=unnecessary_text
 name=%F_CITY_SYLL
 -
 obj=program_text
-name=%C: - %s<br>\n
--
-obj=program_text
 name=%d buildings\n
 -
 obj=program_text
@@ -283,7 +280,7 @@ obj=program_text
 name=airplane
 -
 obj=program_text
-name=air_wt
+name=air
 note=waytype for run/taxiways
 -
 obj=program_text
@@ -921,10 +918,7 @@ obj=program_text
 name=Happy
 -
 obj=program_text
-name=Helligk.
--
-obj=program_text
-name=Helligk. u. Farben
+name=Display settings
 -
 obj=program_text
 name=Help
@@ -2075,9 +2069,6 @@ obj=program_text
 name=way %s now available:\n
 -
 obj=program_text
-name=way %s now available:\n%s\n
--
-obj=program_text
 name=Ways not connected
 -
 obj=program_text
@@ -2906,10 +2897,6 @@ name=Usage: %.0f %%
 note=powernet info window
 -
 obj=program_text
-name=\nAct. Load: %u MW\n
-note=powernet info window (depricated)
--
-obj=program_text
 name=Supplied: %.0f %%
 note=powernet info window
 -
@@ -2990,7 +2977,7 @@ name=find mismatch
 note=play-online window: button to compare paksets of client and server
 ---
 obj=program_text
-name=Air
+name=Aircraft
 note=tooltip in linemanagement window
 ---
 obj=program_text
@@ -3230,10 +3217,6 @@ obj=program_text
 name=Or enter a server manually:
 obj=program_text
 note=Server information window
----
-name=Show servers where game version or pakset does not match your client
-obj=program_text
-note=Tooltip in server information window
 ---
 name=Show servers where game version or pakset does not match your client
 obj=program_text
@@ -3935,9 +3918,6 @@ name=Wind direction
 info=Climate window
 -
 obj=program_text
-name=Install
--
-obj=program_text
 name=Select one or more graphics to install (Ctrl+click):
 note=pakinstaller window
 -
@@ -4057,7 +4037,7 @@ name=31th
 note=ordinal number en
 -
 obj=program_text
-name=ORDINAL_DAR_SYMBOL
+name=ORDINAL_DAY_SYMBOL
 note=ordinal day symbol (English th, german . frensh e
 -
 obj=program_text
@@ -4126,7 +4106,7 @@ note=button in display setting
 --
 obj=program_text
 name=Screen scale:
-note button in display setting
+note=button in display setting
 --
 obj=button_text
 name=Lake
@@ -4227,6 +4207,61 @@ obj=program_text
 name=Install paks
 note=loadingbar during paks download and install
 --
+obj=program_text
+name=remove signal
+note=button/tool tooltip on removing signals
+--
+obj=program_text
+name=transparent background
+--
+obj=program_text
+name=Show networks
+--
+obj=program_text
+name=Shows buttons on network overlay.
+note=tooltip to Show networks
+--
+obj=program_text
+name=Loading time:
+note=Time for full load
+--
+obj=error_text
+name=No suitable crossing
+note=Displayed when a route search failed as one possible cause
+--
+obj=error_text
+name=No curves on runways
+note=Displayed when a route search failed as one possible cause
+--
+obj=tooltip_text
+name=Mirrors order of stops
+note=tooltip for mirror stop order button
+--
+obj=program_text
+name=Revert schedule
+note=button to restore original schedule
+--
+obj=tooltip_text
+name=Revert to original schedule
+note=tooltip to restore original schedule
+--
+obj=program_text
+name=Invert stops
+note=button to invert stop order
+--
+obj=tooltip_text
+name=Enter intervall in days, hours, minutes
+note=tooltip for timeinput gui element
+--
+obj=program_text
+name=Single toolbar only
+note=button in display setting
+--
+obj=program_text
+name=Vehicle count:
+note=number of convoi vehicles in the convoi details
+--
+
 
 
 #obj=help_text
@@ -4446,3 +4481,9 @@ note=loadingbar during paks download and install
 #obj=error_text
 #name=No soundfont found!\n\nMusic won't play until you load a soundfont from the sound options menu.
 #-
+#obj=program_text
+#name=Helligk.
+#-
+#obj=program_text
+#name=\nAct. Load: %u MW\n
+#note=powernet info window (depricated)

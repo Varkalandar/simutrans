@@ -34,7 +34,7 @@ endif ()
 
 if (APPLE)
 	list(APPEND CMAKE_PREFIX_PATH "/usr/local/opt/readline")
-	link_directories(/usr/local/lib)
+	link_directories(/usr/local/lib /opt/homebrew/lib)
 	set(CMAKE_EXE_LINKER_FLAGS "-framework Cocoa")
 endif ()
 
@@ -98,19 +98,24 @@ set_target_properties( simutrans PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BIN
 
 
 #
-# Generate revision on compile time (so only if needed)
+# Generate revision on compile time (so only if needed) if no revision is given
 #
-string(FIND ${CMAKE_GENERATOR} "Visual Studio" VS )
-if (${VS} EQUAL 0)
-	# using a script for MSVC project files
-	file(WRITE ${CMAKE_SOURCE_DIR}/revision.h "#define REVISION \n")
-	add_custom_command(TARGET simutrans PRE_BUILD WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} COMMAND cscript.exe /Nologo revision.jse COMMENT "Find SVN revision")
+if (${SIMUTRANS_USE_REVISION})
+	file(WRITE ${CMAKE_SOURCE_DIR}/src/simutrans/revision.h "#define REVISION ${SIMUTRANS_USE_REVISION}\n")
+	message(STATUS "Compiling Simutrans with manually specified revision ${SIMUTRANS_USE_REVISION}")
 else ()
-	# using custom target svnhear that is always built to update the revision.h file using cmake script
-	add_custom_target(svnheader ALL DEPENDS svn_header)
-	add_custom_command(OUTPUT svn_header COMMAND ${CMAKE_COMMAND} -DSOURCE_DIR=${CMAKE_SOURCE_DIR} -P ${CMAKE_MODULE_PATH}/SimutransRevision.cmake)
-	set_source_files_properties(${CMAKE_SOURCE_DIR}/revision.h PROPERTIES GENERATED TRUE HEADER_FILE_ONLY TRUE)
-	add_dependencies(simutrans svnheader)
+	string(FIND ${CMAKE_GENERATOR} "Visual Studio" VS )
+	if (${VS} EQUAL 0)
+		# using a script for MSVC project files
+		file(WRITE ${CMAKE_SOURCE_DIR}/src/simutrans/revision.h "#define REVISION \n")
+		add_custom_command(TARGET simutrans PRE_BUILD WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} COMMAND cscript.exe /Nologo tools/revision.jse COMMENT "Find SVN revision")
+	else ()
+		# using custom target svnhear that is always built to update the revision.h file using cmake script
+		add_custom_target(svnheader ALL DEPENDS svn_header)
+		add_custom_command(OUTPUT svn_header COMMAND ${CMAKE_COMMAND} -DSOURCE_DIR=${CMAKE_SOURCE_DIR} -P ${CMAKE_MODULE_PATH}/SimutransRevision.cmake)
+		set_source_files_properties(${CMAKE_SOURCE_DIR}/src/simutrans/revision.h PROPERTIES GENERATED TRUE HEADER_FILE_ONLY TRUE)
+		add_dependencies(simutrans svnheader)
+	endif ()
 endif ()
 
 #
@@ -134,7 +139,6 @@ else ()
 		target_sources(simutrans PRIVATE src/simutrans/sys/clipboard_internal.cc)
 	endif ()
 	if (APPLE)
-		target_sources(simutrans PRIVATE src/OSX/translocation.m)
 		#Darwin kernel version is used to identify macOS version (16->10.12/Sierra)
 		if (CMAKE_HOST_SYSTEM_VERSION VERSION_GREATER_EQUAL 16) #AVF
 			set(BACKUP_SOUND src/simutrans/sound/AVF_core-audio_sound.mm)
@@ -323,87 +327,7 @@ add_custom_target(test
 #
 # Installation
 #
-install(TARGETS simutrans RUNTIME DESTINATION "${CMAKE_BINARY_DIR}/simutrans/" BUNDLE DESTINATION "${CMAKE_BINARY_DIR}/simutrans/")
-
-install(DIRECTORY "${CMAKE_SOURCE_DIR}/simutrans" DESTINATION "${CMAKE_BINARY_DIR}")
-
-# download language files
-if (MSVC)
-	# MSVC has no variable on the install target path at execution time, which is why we expand the directories at creation time!
-	install(CODE "execute_process(COMMAND powershell -ExecutionPolicy Bypass -File ${CMAKE_SOURCE_DIR}/tools/get_lang_files.ps1 WORKING_DIRECTORY ${simutrans_BINARY_DIR})")
-else ()
-	install(CODE "execute_process(COMMAND sh ${CMAKE_SOURCE_DIR}/tools/get_lang_files.sh WORKING_DIRECTORY \${CMAKE_BINARY_DIR})")
-endif ()
-
-# pak installer
-if (NOT WIN32)
-	install(FILES ${CMAKE_SOURCE_DIR}/tools/get_pak.sh DESTINATION "${CMAKE_BINARY_DIR}/simutrans/"
-		PERMISSIONS
-			OWNER_READ OWNER_WRITE OWNER_EXECUTE
-			GROUP_READ GROUP_EXECUTE
-			WORLD_READ WORLD_EXECUTE
-	)
-else ()
-	# NSIS must be installed manually in the path with the right addons
-	if(MINGW)
-		install(CODE "execute_process(COMMAND makensis onlineupgrade.nsi WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/src/Windows/nsis)")
-	else ()
-		install(CODE "execute_process(COMMAND cmd /k \"$ENV{ProgramFiles\(x86\)}/NSIS/makensis.exe\" onlineupgrade.nsi WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/src/Windows/nsis)")
-	endif ()
-	install(FILES "${CMAKE_SOURCE_DIR}/src/Windows/nsis/download-paksets.exe" DESTINATION "${CMAKE_BINARY_DIR}/simutrans")
-endif ()
-
-# install pak if needed
-if (SIMUTRANS_INSTALL_PAK64)
-	if (MSVC)
-		install(CODE
-		"if(NOT EXISTS ${simutrans_BINARY_DIR}/simutrans/pak)
-		execute_process(COMMAND powershell -Command \"Remove-Item \'${simutrans_BINARY_DIR}/simutrans/pak\' -Recurse\" WORKING_DIRECTORY ${simutrans_BINARY_DIR})
-		file(STRINGS ${CMAKE_SOURCE_DIR}/src/simutrans/paksetinfo.h URLpak64 REGEX \"/pak64/\")
-		string( REGEX REPLACE \"^.[\\t ]*\\\"\" \"\" URLpak64 \${URLpak64})
-		string( REGEX REPLACE \"\\\", .*\$\" \"\" URLpak64 \${URLpak64})
-		message(\"install pak to \" ${simutrans_BINARY_DIR})
-		execute_process(COMMAND powershell -ExecutionPolicy Bypass -File ${CMAKE_SOURCE_DIR}/tools/get_pak.ps1 \${URLpak64} WORKING_DIRECTORY ${simutrans_BINARY_DIR}/simutrans)
-		endif ()
-		")
-	else ()
-		# install pak64 with the bundle
-		install(CODE
-		"file(STRINGS  ${CMAKE_SOURCE_DIR}/src/simutrans/paksetinfo.h URLpak64 REGEX \"/pak64/\")
-		 string( REGEX REPLACE \"^.[\\t ]*\\\"\" \"\" URLpak64 \${URLpak64})
-		 string( REGEX REPLACE \"\\\", .*\$\" \"\" URLpak64 \${URLpak64})
-		 execute_process(COMMAND sh ../../${CMAKE_SOURCE_DIR}/tools/get_pak.sh \${URLpak64} WORKING_DIRECTORY \${CMAKE_BINARY_DIR}/simutrans)
-		")
-	endif ()
-endif ()
-
-# bundle libraries on linux if requested
-if(OPTION_BUNDLE_LIBRARIES AND UNIX AND NOT APPLE)
-	# Steam Runtime already includes some of our libraries
-	if (SIMUTRANS_STEAM_BUILT)
-		install(CODE [[
-			file(GET_RUNTIME_DEPENDENCIES
-					RESOLVED_DEPENDENCIES_VAR DEPENDENCIES
-					EXECUTABLES "${CMAKE_BINARY_DIR}/simutrans/simutrans"
-					PRE_EXCLUDE_REGEXES "libSDL2*|libz.so*|libfreetype*|libpng*|libglib*|libogg*|libpcre*|libvorbis*"
-					POST_EXCLUDE_REGEXES "ld-linux|libc.so|libdl.so|libm.so|libgcc_s.so|libpthread.so|libstdc...so|libgomp.so")
-		]])
-	else ()
-		install(CODE [[
-			file(GET_RUNTIME_DEPENDENCIES
-					RESOLVED_DEPENDENCIES_VAR DEPENDENCIES
-					EXECUTABLES "${CMAKE_BINARY_DIR}/simutrans/simutrans"
-					PRE_EXCLUDE_REGEXES "libSDL2*|libz.so*"
-					POST_EXCLUDE_REGEXES "ld-linux|libc.so|libdl.so|libm.so|libgcc_s.so|libpthread.so|libstdc...so|libgomp.so")
-		]])
-	endif ()
-	install(CODE [[
-		file(INSTALL
-				DESTINATION "${CMAKE_BINARY_DIR}/simutrans/lib"
-				FILES ${DEPENDENCIES}
-				FOLLOW_SYMLINK_CHAIN)
-	]])
-endif ()
+include(SimutransInstall)
 
 #
 # Nettool/Makeobj

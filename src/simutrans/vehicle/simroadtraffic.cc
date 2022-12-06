@@ -230,14 +230,15 @@ void road_user_t::finish_rd()
 /**********************************************************************************************************************/
 /* statsauto_t (city cars) from here on */
 
+freelist_iter_tpl<private_car_t> private_car_t::fl;
 
 static weighted_vector_tpl<const citycar_desc_t*> liste_timeline;
 stringhashtable_tpl<const citycar_desc_t *> private_car_t::table;
 
 bool private_car_t::register_desc(const citycar_desc_t *desc)
 {
-	if(  table.remove(desc->get_name())  ) {
-		dbg->doubled( "citycar", desc->get_name() );
+	if(const citycar_desc_t *old = table.remove(desc->get_name())  ) {
+		delete old;
 	}
 	table.put(desc->get_name(), desc);
 	return true;
@@ -311,11 +312,6 @@ private_car_t::~private_car_t()
 	if(gr  &&  gr->ist_uebergang()) {
 		gr->find<crossing_t>(2)->release_crossing(this);
 	}
-
-	// just to be sure we are removed from this list!
-	if(time_to_life>0) {
-		welt->sync.remove(this);
-	}
 	welt->buche( -1, karte_t::WORLD_CITYCARS );
 }
 
@@ -326,9 +322,6 @@ private_car_t::private_car_t(loadsave_t *file) :
 	rdwr(file);
 	ms_traffic_jam = 0;
 	calc_disp_lane();
-	if(desc) {
-		welt->sync.add(this);
-	}
 	welt->buche( +1, karte_t::WORLD_CITYCARS );
 }
 
@@ -377,7 +370,7 @@ sync_result private_car_t::sync_step(uint32 delta_t)
 			else {
 				if(  ms_traffic_jam > welt->ticks_per_world_month  &&  old_ms_traffic_jam<=welt->ticks_per_world_month  ) {
 					// message after two month, reset waiting timer
-					welt->get_message()->add_message( translator::translate("To heavy traffic\nresults in traffic jam.\n"), get_pos().get_2d(), message_t::traffic_jams|message_t::expire_after_one_month_flag, color_idx_to_rgb(COL_ORANGE) );
+					welt->get_message()->add_message( translator::translate("To heavy traffic\nresults in traffic jam.\n"), get_pos(), message_t::traffic_jams|message_t::expire_after_one_month_flag, color_idx_to_rgb(COL_ORANGE) );
 				}
 			}
 		}

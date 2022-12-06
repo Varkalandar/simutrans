@@ -16,7 +16,21 @@
 #include "../utils/simrandom.h"
 void rdwr_win_settings(loadsave_t *file); // simwin
 
+char env_t::base_dir[PATH_MAX];
+char env_t::install_dir[PATH_MAX];
+char env_t::user_dir[PATH_MAX];
+std::string env_t::pak_dir;
+std::string env_t::pak_name;
+
+#ifndef __ANDROID__
 sint16 env_t::menupos = MENU_TOP;
+bool env_t::single_toolbar_mode = false;
+sint16 env_t::dpi_scale = 100;
+#else
+sint16 env_t::menupos = MENU_BOTTOM;
+bool env_t::single_toolbar_mode = true;
+sint16 env_t::dpi_scale = -1;
+#endif
 sint16 env_t::fullscreen = WINDOWED;
 sint16 env_t::display_scale_percent = 100;
 bool env_t::reselect_closes_tool = true;
@@ -31,9 +45,10 @@ sint16 env_t::simple_drawing_normal = 4;
 sint16 env_t::simple_drawing_default = 24;
 uint8 env_t::follow_convoi_underground = 2;
 
-char env_t::data_dir[PATH_MAX];
+bool env_t::random_pedestrians = true;
+bool env_t::stop_pedestrians = true;
+
 plainstring env_t::default_theme;
-const char *env_t::user_dir = 0;
 const char *env_t::savegame_version_str = SAVEGAME_VER_NR;
 bool env_t::straight_way_without_control = false;
 bool env_t::networkmode = false;
@@ -103,7 +118,6 @@ settings_t env_t::default_settings;
 bool env_t::player_finance_display_account = true;
 
 // the following initialisation is not important; set values in init()!
-std::string env_t::objfilename;
 bool env_t::night_shift;
 bool env_t::hide_with_transparency;
 bool env_t::hide_trees;
@@ -234,6 +248,9 @@ void env_t::init()
 	townhall_info = false;
 	single_info = true;
 	single_line_gui = false;
+
+	random_pedestrians = true;
+	stop_pedestrians = true;
 
 	window_buttons_right = false;
 	window_frame_active = false;
@@ -566,8 +583,8 @@ void env_t::rdwr(loadsave_t *file)
 			soundfont_filename = str ? str.c_str() : "";
 		}
 
-		file->rdwr_short(env_t::menupos);
-		env_t::menupos &= 3;
+		file->rdwr_short( menupos );
+		menupos &= 3;
 		file->rdwr_bool( reselect_closes_tool );
 
 		file->rdwr_bool( single_line_gui );
@@ -582,8 +599,15 @@ void env_t::rdwr(loadsave_t *file)
 		file->rdwr_bool(scroll_infinite);
 	}
 
-	if (file->is_version_atleast(123, 2)) {
+	if( file->is_version_atleast(123, 2) ) {
 		file->rdwr_short(scroll_threshold);
+		file->rdwr_bool(single_toolbar_mode);
+		file->rdwr_short(dpi_scale);
+		if( file->is_loading() ) {
+			dr_set_screen_scale(dpi_scale);
+		}
+		file->rdwr_bool(random_pedestrians);
+		file->rdwr_bool(stop_pedestrians);
 	}
 
 	// server settings are not saved, since they are server specific

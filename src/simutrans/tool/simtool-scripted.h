@@ -3,8 +3,8 @@
  * (see LICENSE.txt)
  */
 
-#ifndef SIMTOOL_SCRIPTED_H
-#define SIMTOOL_SCRIPTED_H
+#ifndef TOOL_SIMTOOL_SCRIPTED_H
+#define TOOL_SIMTOOL_SCRIPTED_H
 
 
 #include "../tool/simmenu.h"
@@ -88,8 +88,8 @@ protected:
 public:
 	tool_exec_script_t(const scripted_tool_info_t *info = NULL);
 	/// is network-safe, as calls to work-commands will be properly handled in network mode
-	bool is_init_network_safe() const OVERRIDE { return true; }
-	bool is_work_network_safe() const OVERRIDE { return true; }
+	bool is_init_keeps_game_state() const OVERRIDE { return true; }
+	bool is_work_keeps_game_state() const OVERRIDE { return true; }
 
 	bool init(player_t* player) OVERRIDE;
 	bool exit(player_t* player) OVERRIDE;
@@ -105,8 +105,8 @@ class tool_exec_two_click_script_t : public two_click_tool_t, public exec_script
 public:
 	tool_exec_two_click_script_t(const scripted_tool_info_t *info = NULL);
 	/// is network-safe, as calls to work-commands will be properly handled in network mode
-	bool is_work_network_safe() const OVERRIDE { return true; }
-	bool is_init_network_safe() const OVERRIDE { return true; }
+	bool is_work_keeps_game_state() const OVERRIDE { return true; }
+	bool is_init_keeps_game_state() const OVERRIDE { return true; }
 
 	bool init(player_t* player) OVERRIDE;
 	bool exit(player_t* player) OVERRIDE;

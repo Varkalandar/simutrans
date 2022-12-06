@@ -31,27 +31,38 @@ enum { MENU_LEFT, MENU_TOP, MENU_RIGHT, MENU_BOTTOM };
 class env_t
 {
 public:
-	/// Points to the current simutrans data directory. Usually this is the same directory
-	/// where the executable is located, unless -use_workdir is specified.
-	static char data_dir[PATH_MAX];
+	/// Points to the simutrans data directory which hosts translation theme etc.
+	/// This directory may be write protected or only accesible for certain users
+	/// May contain pak, scripts and addons
+	static char base_dir[PATH_MAX];
+
+	/// Points to a global writable directory, where downloaded content content is stored
+	/// This directory is writable to all users to store global content (like paksets)
+	static char install_dir[PATH_MAX];
+
+	/// Points to a the user's writable directory
+	/// This directory writable to the local user
+	static char user_dir[PATH_MAX];
+
+	/// the selected pak (whole path, can be write protected)
+	static std::string pak_dir;
+
+	/// the folder name of the selected pak (with trailing path separator)
+	static std::string pak_name;
 
 	static sint16 menupos;
+	static bool single_toolbar_mode;
 
 	static sint16 fullscreen;
+	static sint16 dpi_scale;
 
 	/// Controls size of the virtual display
 	static sint16 display_scale_percent;
 
 	static bool reselect_closes_tool;
 
-	/// points to the current user directory for loading and saving
-	static const char *user_dir;
-
 	/// version for which the savegames should be created
 	static const char *savegame_version_str;
-
-	/// name of the directory to the pak-set
-	static std::string objfilename;
 
 	/// this the the preferred GUI theme at startup
 	static plainstring default_theme;
@@ -183,6 +194,12 @@ public:
 
 	/// open only one info window per click on a map-square
 	static bool single_info;
+
+	///  pedestrians in cities
+	static bool random_pedestrians;
+
+	///  pedestrians at stops
+	static bool stop_pedestrians;
 
 	///  linelist enforcing single line GUI
 	static bool single_line_gui;

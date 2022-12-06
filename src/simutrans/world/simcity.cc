@@ -9,7 +9,6 @@
 #include <string.h>
 #include <math.h>
 
-#include "../obj/way/strasse.h"
 #include "../ground/grund.h"
 #include "../ground/boden.h"
 #include "../gui/simwin.h"
@@ -18,7 +17,6 @@
 #include "../player/simplay.h"
 #include "simplan.h"
 #include "../display/simimg.h"
-#include "../vehicle/simroadtraffic.h"
 #include "../simhalt.h"
 #include "../simfab.h"
 #include "simcity.h"
@@ -34,6 +32,10 @@
 #include "../simdebug.h"
 
 #include "../obj/gebaeude.h"
+#include "../obj/way/strasse.h"
+
+#include "../vehicle/pedestrian.h"
+#include "../vehicle/simroadtraffic.h"
 
 #include "../dataobj/translator.h"
 #include "../dataobj/settings.h"
@@ -46,6 +48,7 @@
 #include "../builder/brueckenbauer.h"
 #include "../builder/hausbauer.h"
 #include "../builder/fabrikbauer.h"
+
 #include "../utils/cbuffer.h"
 #include "../utils/simrandom.h"
 #include "../utils/simstring.h"
@@ -272,14 +275,16 @@ void stadt_t::bewerte_haus(koord k, sint32 rd, const rule_t &regel)
 /**
  * Reads city configuration data
  */
-bool stadt_t::cityrules_init(const std::string &objfilename)
+bool stadt_t::cityrules_init()
 {
 	tabfile_t cityconf;
 	// first take user data, then user global data
 	const std::string user_dir=env_t::user_dir;
 	if (!cityconf.open((user_dir+"cityrules.tab").c_str())) {
-		if (!cityconf.open((objfilename+"config/cityrules.tab").c_str())) {
-			dbg->fatal("stadt_t::init()", "Can't read cityrules.tab" );
+		if (!cityconf.open((user_dir+"addons/"+env_t::pak_name+"config/cityrules.tab").c_str())) {
+			if (!cityconf.open((env_t::pak_dir+"config/cityrules.tab").c_str())) {
+				dbg->fatal("stadt_t::init()", "Can't read cityrules.tab" );
+			}
 		}
 	}
 
@@ -1693,12 +1698,15 @@ void stadt_t::new_month( bool recalc_destinations )
 					return;
 				}
 
-				grund_t* gr = welt->lookup_kartenboden(k);
-				if(  gr != NULL  &&  gr->get_weg(road_wt)  &&  ribi_t::is_twoway(gr->get_weg_ribi_unmasked(road_wt))  &&  gr->find<private_car_t>() == NULL) {
-					private_car_t* vt = new private_car_t(gr, koord::invalid);
-					gr->obj_add(vt);
-					welt->sync.add(vt);
-					number_of_cars--;
+				if(  grund_t* gr = welt->lookup_kartenboden(k)  ) {
+					if(  weg_t* w = gr->get_weg(road_wt)  ) {
+						// do not spawn on privte roads or if there is already a car
+						if(  ribi_t::is_twoway(w->get_ribi_unmasked())  &&  player_t::check_owner(NULL,w->get_owner())  &&  gr->find<private_car_t>() == NULL  ) {
+							private_car_t* vt = new private_car_t(gr, koord::invalid);
+							gr->obj_add(vt);
+							number_of_cars--;
+						}
+					}
 				}
 			}
 		}
@@ -1720,13 +1728,13 @@ void stadt_t::calc_growth()
 	// we use the incoming storage as a measure and we will only look for end consumers (power stations, markets)
 	for(factory_entry_t const& i : target_factories_pax.get_entries()) {
 		fabrik_t *const fab = i.factory;
-		if (fab->get_lieferziele().empty() && !fab->get_suppliers().empty()) {
+		if (fab->get_consumer().empty() && !fab->get_suppliers().empty()) {
 			// consumer => check for it storage
 			const factory_desc_t *const desc = fab->get_desc();
 			for(  int i=0;  i<desc->get_supplier_count();  i++  ) {
 				city_history_month[0][HIST_GOODS_NEEDED] ++;
 				city_history_year[0][HIST_GOODS_NEEDED] ++;
-				if(  fab->input_vorrat_an( desc->get_supplier(i)->get_input_type() )>0  ) {
+				if(  fab->get_input_stock( desc->get_supplier(i)->get_input_type() )>0  ) {
 					city_history_month[0][HIST_GOODS_RECEIVED] ++;
 					city_history_year[0][HIST_GOODS_RECEIVED] ++;
 				}
@@ -1798,8 +1806,8 @@ void stadt_t::step_grow_city( bool new_town )
 }
 
 
-/* this creates passengers and mail for everything is is therefore one of the CPU hogs of the machine
- * think trice, before applying optimisation here ...
+/* this creates passengers and mail for everything. It is therefore one of the CPU hogs of the machine
+ * think trice, before adding here ...
  */
 void stadt_t::step_passagiere()
 {
@@ -1825,8 +1833,8 @@ void stadt_t::step_passagiere()
 			(gb->get_tile()->get_desc()->get_mail_level() + 8) >> 3 ;
 
 	// create pedestrians in the near area?
-	if (welt->get_settings().get_random_pedestrians()  &&  ispass) {
-		haltestelle_t::generate_pedestrians(gb->get_pos(), num_pax);
+	if (env_t::random_pedestrians  &&  ispass) {
+		pedestrian_t::generate_pedestrians_near(welt->lookup_kartenboden(gb->get_pos().get_2d()), num_pax);
 	}
 
 	// suitable start search
@@ -2335,12 +2343,12 @@ void stadt_t::check_bau_spezial(bool new_town)
 				if (desc->get_all_layouts() > 1) {
 					rotate = (simrand(20) & 2) + is_rotate;
 				}
-				hausbauer_t::build( owner, best_pos, rotate, desc );
+				gebaeude_t* monument = hausbauer_t::build( owner, best_pos, rotate, desc );
 				// tell the player, if not during initialization
 				if (!new_town) {
 					cbuffer_t buf;
 					buf.printf( translator::translate("To attract more tourists\n%s built\na %s\nwith the aid of\n%i tax payers."), get_name(), make_single_line_string(translator::translate(desc->get_name()), 2), get_einwohner());
-					welt->get_message()->add_message(buf, best_pos, message_t::city, CITY_KI, desc->get_tile(0)->get_background(0, 0, 0));
+					welt->get_message()->add_message(buf, monument->get_pos(), message_t::city, CITY_KI, desc->get_tile(0)->get_background(0, 0, 0));
 				}
 			}
 		}
@@ -2408,7 +2416,7 @@ void stadt_t::check_bau_spezial(bool new_town)
 					if (!new_town) {
 						cbuffer_t buf;
 						buf.printf( translator::translate("With a big festival\n%s built\na new monument.\n%i citicens rejoiced."), get_name(), get_einwohner() );
-						welt->get_message()->add_message(buf, best_pos + koord(1, 1), message_t::city, CITY_KI, desc->get_tile(0)->get_background(0, 0, 0));
+						welt->get_message()->add_message(buf, gb->get_pos() + koord3d(1, 1, 0), message_t::city, CITY_KI, desc->get_tile(0)->get_background(0, 0, 0));
 					}
 				}
 			}
@@ -2604,7 +2612,7 @@ void stadt_t::check_bau_townhall(bool new_town)
 		if (!new_town) {
 			cbuffer_t buf;
 			buf.printf(translator::translate("%s wasted\nyour money with a\nnew townhall\nwhen it reached\n%i inhabitants."), name.c_str(), get_einwohner());
-			welt->get_message()->add_message(buf, best_pos, message_t::city, CITY_KI, desc->get_tile(layout, 0, 0)->get_background(0, 0, 0));
+			welt->get_message()->add_message(buf, new_gb->get_pos(), message_t::city, CITY_KI, desc->get_tile(layout, 0, 0)->get_background(0, 0, 0));
 		}
 		else {
 			welt->lookup_kartenboden(best_pos + offset)->set_text( name );
@@ -3403,16 +3411,16 @@ void stadt_t::generate_private_cars(koord pos, koord target)
 				if(  grund_t* gr = welt->lookup_kartenboden(k) ) {
 					const weg_t* weg = gr->get_weg(road_wt);
 					if (weg != NULL && (
-								gr->get_weg_ribi_unmasked(road_wt) == ribi_t::northsouth ||
-								gr->get_weg_ribi_unmasked(road_wt) == ribi_t::eastwest
-							)) {
+								weg->get_ribi_unmasked(road_wt) == ribi_t::northsouth ||
+						        weg->get_ribi_unmasked(road_wt) == ribi_t::eastwest)  &&
+						        player_t::check_owner(NULL,w->get_owner()
+					) {
 						// already a car here => avoid congestion
 						if(gr->obj_bei(gr->get_top()-1)->is_moving()) {
 							continue;
 						}
 						private_car_t* vt = new private_car_t(gr, target);
 						gr->obj_add(vt);
-						welt->sync.add(vt);
 						city_history_month[0][HIST_CITYCARS] ++;
 						city_history_year[0][HIST_CITYCARS] ++;
 						number_of_cars --;
@@ -3465,7 +3473,7 @@ bool stadt_t::build_road(const koord k, player_t* player_, bool forced)
 		// kartenboden may have changed - also ensure is land
 		bd = welt->lookup_kartenboden(k);
 		if (bd->get_typ() == grund_t::wasser) {
-			welt->set_water_hgt(k, bd->get_hoehe()-1);
+			welt->set_water_hgt_nocheck(k, bd->get_hoehe()-1);
 			welt->access(k)->correct_water();
 			welt->set_climate(k, c, true);
 			bd = welt->lookup_kartenboden(k);

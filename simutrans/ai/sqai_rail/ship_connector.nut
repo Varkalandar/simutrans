@@ -53,6 +53,12 @@ class ship_connector_t extends manager_t
 			return r_t(RT_TOTAL_FAIL)
 		}
 
+		if ( build_check_month > world.get_time().month ) {
+			// not build link
+			gui.add_message_at(our_player, " not build line : build_check_month = " + build_check_month, world.get_time())
+			return r_t(RT_TOTAL_FAIL)
+		}
+
 		switch(phase) {
 
 			case 0: {
@@ -84,6 +90,7 @@ class ship_connector_t extends manager_t
 
 				if (c_start.len()>0  &&  c_end.len()>0) {
 					if ( print_message_box == 1 ) { gui.add_message_at(pl, "Water way from " + coord_to_string(c_start[0]) + " to " + coord_to_string(c_end[0]), world.get_time()) }
+
 					phase ++
 				}
 				else {
@@ -115,20 +122,45 @@ class ship_connector_t extends manager_t
 
 						if (key in c_harbour_tiles) {
 							if ( c_harbour_tiles[key].get_halt() && c_harbour_tiles[key].get_halt().get_owner().nr == our_player_nr && c_harbour_tiles[key].find_object(mo_building) && c_harbour_tiles[key].find_object(mo_building).get_desc().get_type()==building_desc_x.station ) {
-								gui.add_message_at(our_player, "Cannot place any harbour at " + coord_to_string(c_harbour_tiles[key]) + " station exists", c_harbour_tiles[key])
+								// station from player exists - combined station
+								if ( print_message_box == 2 ) {
+									gui.add_message_at(our_player, "Cannot place any harbour at " + coord_to_string(c_harbour_tiles[key]) + " station exists :: search new place", c_harbour_tiles[key])
+								}
 								// to do search new field
-								//c_start.clear()
-								//c_start = find_anchorage(c_harbour_tiles[key],  planned_station, planned_harbour_flat, c_harbour_tiles)
-								return r_t(RT_TOTAL_FAIL)
+								c_start.clear()
+								c_start = find_new_place(c_harbour_tiles[key].get_halt(),  planned_station, planned_harbour_flat, c_harbour_tiles)
+								key = coord3d_to_key(c_start[0])
+
+								if ( c_harbour_tiles[key].get_halt() && c_harbour_tiles[key].get_halt().get_owner().nr == our_player_nr && c_harbour_tiles[key].find_object(mo_building) && c_harbour_tiles[key].find_object(mo_building).get_desc().get_type()==building_desc_x.station ) {
+									gui.add_message_at(our_player, "Cannot place any harbour at " + coord_to_string(c_harbour_tiles[key]), c_harbour_tiles[key])
+									return r_t(RT_TOTAL_FAIL)
+								} else {
+									err = build_harbour(c_harbour_tiles[key], c_start)
+								}
 							} else {
 								err = build_harbour(c_harbour_tiles[key], c_start)
+								if (err) {
+									if ( c_start.len() > 1 ) {
+										c_start.clear()
+										c_start = find_anchorage(fsrc,  planned_station, planned_harbour_flat, c_harbour_tiles)
+										key = coord3d_to_key(c_start[0])
+										if ( c_start.len() > 0 ) {
+											err = null
+											err = build_harbour(c_harbour_tiles[key], c_start)
+										}
+									}
+								}
 							}
 						}
 
-						/*key = coord3d_to_key(c_start[0])
-						if (key in c_harbour_tiles) {
-
-						}*/
+						if (err) {
+							print("Failed to build harbour at " + key + " / " + err)
+							if ( print_message_box == 2 ) {
+								gui.add_message_at(pl, " --- Failed to build harbour at " + key + " / " + err, world.get_time())
+								gui.add_message_at(pl, " --- c_start " + coord_to_string(c_start[0]), world.get_time())
+							}
+							return r_t(RT_TOTAL_FAIL)
+						}
 					}
 					// check station connection to factory or combined station
 
@@ -139,6 +171,10 @@ class ship_connector_t extends manager_t
 
 						key = coord3d_to_key(c_end[0])
 						if (key in c_harbour_tiles) {
+							if ( c_harbour_tiles[key].find_object(mo_building) != null ) {
+								gui.add_message_at(pl, " --- tile to build harbour not free", world.get_time())
+								return r_t(RT_TOTAL_FAIL)
+							}
 							err = build_harbour(c_harbour_tiles[key], c_end)
 						}
 					}
@@ -157,7 +193,8 @@ class ship_connector_t extends manager_t
 				}
 			case 4: // find route again after harbour was built
 				{
-					if (c_start.len()>1  ||  c_end.len()>1) {
+
+					 if (c_start.len()>1  ||  c_end.len()>1) {
 						local err = find_route()
 						if (err) {
 							print("No way2 from " + coord_to_string(c_start[0])+ " to " + coord_to_string(c_end[0]))
@@ -178,8 +215,8 @@ class ship_connector_t extends manager_t
 					}
 
 					if ( !depot_found && print_message_box == 3 ) {
-			 			gui.add_message_at(pl," *** depot not found *** ", world.get_time())
-					}	else if ( print_message_box == 3 ) {
+						gui.add_message_at(pl," *** depot not found *** ", world.get_time())
+					} else if ( print_message_box == 3 ) {
 						gui.add_message_at(pl," ---> depot found : " + depot_found.get_pos(), coord_to_string(depot_found))
 					}
 
@@ -235,7 +272,24 @@ class ship_connector_t extends manager_t
 					local sched = schedule_x(wt_water, [])
 					sched.entries.append( schedule_entry_x(c_start[0], 100, 0) );
 					sched.entries.append( schedule_entry_x(c_end[0], 0, 0) );
+
+					if ( sched.entries[0].get_halt(pl).get_name() == sched.entries[1].get_halt(pl).get_name() ) {
+						// set new start
+
+						//gui.add_message_at(pl," ... start name (" + sched.entries[0].get_halt(pl).get_name() + ") == end name (" + sched.entries[1].get_halt(pl).get_name() + ")", world.get_time())
+						//gui.add_message_at(pl," ... c_start len = " + c_start.len(), world.get_time())
+
+						c_start.clear()
+						c_start = find_anchorage(fsrc,  planned_station, planned_harbour_flat, c_harbour_tiles)
+
+						sched.entries[0] = schedule_entry_x(c_start[0], 100, 0);
+
+						//gui.add_message_at(pl," ... new start name (" + sched.entries[0].get_halt(pl).get_name() + ")", world.get_time())
+						//::debug.pause()
+					}
+
 					c_sched = sched
+
 					phase ++
 				}
 
@@ -306,6 +360,7 @@ class ship_connector_t extends manager_t
 
 		gui.add_message_at(pl, pl.get_name() + " build ship line from " + f_name[0] + " (" + coord_to_string(square_x(cs[0].x, cs[0].y)) + ") to " + f_name[1] + " (" + coord_to_string(square_x(ce[0].x, ce[0].y)) + ")", c_start)
 		*/
+
 		if (c_start.len()>0  &&  c_end.len()>0) {
 			local st = halt_x.get_halt(c_start[0], pl)
 			local f_name = ["", ""]
@@ -314,7 +369,7 @@ class ship_connector_t extends manager_t
 				if ( fl_st.len() > 0 ) {
 					f_name[0] = fl_st[0].get_name()
 				} else {
-					f_name[0] = "station"
+					f_name[0] = st.get_name()
 				}
 			}
 			st = halt_x.get_halt(c_end[0], pl)
@@ -323,7 +378,7 @@ class ship_connector_t extends manager_t
 				if ( fl_st.len() > 0 ) {
 					f_name[1] = fl_st[0].get_name()
 				} else {
-					f_name[1] = "station"
+					f_name[1] = st.get_name()
 				}
 			}
 			local msgtext = format(translate("%s build ship line from %s (%s) to %s (%s)"), pl.get_name(), f_name[0], coord_to_string(c_start[0]), f_name[1], coord_to_string(c_end[0]))
@@ -337,7 +392,7 @@ class ship_connector_t extends manager_t
 				if ( fl_st.len() > 0 ) {
 					f_name[0] = fl_st[0].get_name()
 				} else {
-					f_name[0] = "station"
+					f_name[0] = st.get_name()
 				}
 			}
 			st = halt_x.get_halt(c_end, pl)
@@ -346,7 +401,7 @@ class ship_connector_t extends manager_t
 				if ( fl_st.len() > 0 ) {
 					f_name[1] = fl_st[0].get_name()
 				} else {
-					f_name[1] = "station"
+					f_name[1] = st.get_name()
 				}
 			}
 			local msgtext = format(translate("%s build ship line from %s (%s) to %s (%s)"), pl.get_name(), f_name[0], coord_to_string(c_start), f_name[1], coord_to_string(c_end))
@@ -418,12 +473,45 @@ class ship_connector_t extends manager_t
 						break
 					}
 
+					/*if (to  &&  get_harbour_type_for_tile(to, planned_station, planned_harbour_flat, d) > 0) {
+
+						anch.append(tile)
+						c_harbour_tiles[coord3d_to_key(tile)] <- to
+						break
+					}*/
+				}
+			}
+		}
+		return anch
+	}
+
+	static function find_new_place(halt, planned_station, planned_harbour_flat, c_harbour_tiles)
+	{
+		local tile_list = ::finder.find_water_places( ::finder.get_tiles_near_halt(halt) )
+		local anch = []
+		// find places to build harbour
+		if (tile_list.len()>0) {
+			foreach(tile in tile_list) {
+				for(local d = 1; d<16; d*=2) {
+					local to = tile.get_neighbour(wt_all, d)
+
+					if ( print_message_box == 2 && to.is_empty() ) {
+						gui.add_message_at(our_player, " ... place finder: to.is_empty() " + coord3d_to_string(to) + " = "  + to.is_empty(), world.get_time())
+					}
+
 					if (to  &&  get_harbour_type_for_tile(to, planned_station, planned_harbour_flat, d) > 0) {
 
 						anch.append(tile)
 						c_harbour_tiles[coord3d_to_key(tile)] <- to
 						break
 					}
+
+					/*if (to  &&  get_harbour_type_for_tile(to, planned_station, planned_harbour_flat, d) > 0) {
+
+						anch.append(tile)
+						c_harbour_tiles[coord3d_to_key(tile)] <- to
+						break
+					}*/
 				}
 			}
 		}

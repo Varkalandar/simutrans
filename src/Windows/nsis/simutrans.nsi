@@ -12,9 +12,19 @@
 ; untgz
 ; ShellLink
 
+!define VERSION "0.123.0.1"
+
+VIProductVersion "${VERSION}"
+VIFileVersion "${VERSION}"
+VIAddVersionKey "FileVersion" "${VERSION}"
+
 Unicode true
 
-!include "preparation-functions.nsh"
+; Request application privileges for Windows Vista
+;RequestExecutionLevel highest
+
+!define MULTIUSER_INSTALLMODE_INSTDIR "Simutrans"
+!define MULTIUSER_EXECUTIONLEVEL Highest
 
 var group1
 Name "Simutrans Transport Simulator"
@@ -22,6 +32,13 @@ OutFile "simutrans-online-install.exe"
 
 InstallDir $PROGRAMFILES\Simutrans
 
+!define MUI_UNICON "..\stormoog.ico"
+
+!include "preparation-functions.nsh"
+
+!insertmacro MULTIUSER_PAGE_INSTALLMODE
+
+!include "languages.nsh"
 
 SectionGroup /e !Simutrans
 
@@ -37,11 +54,16 @@ Function PostExeInstall
 
 NotPortable:
   ; make start menu entries
+  SetShellVarContext all
   CreateDirectory "$SMPROGRAMS\Simutrans"
-  CreateShortCut "$SMPROGRAMS\Simutrans\Simutrans.lnk" "$INSTDIR\Simutrans.exe" "-log 1 -debug 3"
+  CreateShortCut "$SMPROGRAMS\Simutrans\Simutrans.lnk" "$INSTDIR\Simutrans.exe" ""
+  CreateShortCut "$SMPROGRAMS\Simutrans\Simutrans (Debug).lnk" "$INSTDIR\Simutrans.exe" "-log 1 -debug 3"
+  ExecWait 'Icacls "$PAKDIR" /grant Users:(OI)(CI)M'
+  WriteUninstaller $INSTDIR\uninstall.exe
+  WriteRegStr HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Simutrans" "DisplayName" "Simutrans Game"
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Simutrans" "DisplayIcon" "$\"$INSTDIR\uninstall.exe$\""
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Simutrans" "UninstallString" "$\"$INSTDIR\uninstall.exe$\""
 finishGDIexe:
-  ; uninstaller not working yet
-  ;WriteUninstaller $INSTDIR\uninstaller.exe
 FunctionEnd
 
 Section /o "Executable (GDI)" GDIexe
@@ -49,6 +71,7 @@ Section /o "Executable (GDI)" GDIexe
   StrCpy $downloadlink "http://downloads.sourceforge.net/project/simutrans/simutrans/123-0-1/simuwin-123-0-1.zip"
   StrCpy $archievename "simuwin-123-0-1.zip"
   StrCpy $downloadname "Simutrans Executable (GDI)"
+  SetOutPath $INSTDIR
   Call DownloadInstallZip
   Call PostExeInstall
 SectionEnd
@@ -58,6 +81,7 @@ Section "Executable (SDL2)" SDLexe
   StrCpy $downloadlink "http://downloads.sourceforge.net/project/simutrans/simutrans/123-0-1/simuwin-sdl-123-0-1.zip"
   StrCpy $archievename "simuwin-sdl-123-0-1.zip"
   StrCpy $downloadname "Simutrans Executable (SDL2)"
+  SetOutPath $INSTDIR
   Call DownloadInstallZip
   Call PostExeInstall
 SectionEnd
@@ -67,6 +91,7 @@ Section /o "Executable (GDI 64bit)" GDI64exe
   StrCpy $downloadlink "http://downloads.sourceforge.net/project/simutrans/simutrans/123-0/simuwin-x64-123-0-1.zip"
   StrCpy $archievename "simuwin-x64-123-0-1.zip"
   StrCpy $downloadname "Simutrans Executable (GDI) only needed for huge maps"
+  SetOutPath $INSTDIR
   Call DownloadInstallZip
   Call PostExeInstall
 SectionEnd
@@ -76,6 +101,7 @@ Section /o "Executable (SDL2 64bit)" SDL64exe
   StrCpy $downloadlink "http://downloads.sourceforge.net/project/simutrans/simutrans/123-0/simuwin-x64-sdl-123-0-1.zip"
   StrCpy $archievename "simuwin-sdl-x64-123-0-1.zip"
   StrCpy $downloadname "Simutrans Executable (SDL2) only needed for huge maps"
+  SetOutPath $INSTDIR
   Call DownloadInstallZip
   Call PostExeInstall
 SectionEnd
@@ -86,6 +112,7 @@ Section "Chinese Font" wenquanyi_font
   StrCpy $downloadlink "http://downloads.sourceforge.net/project/simutrans/simutrans/wenquanyi_9pt-font-bdf.zip"
   StrCpy $archievename "wenquanyi_9pt-font-bdf.zip"
   StrCpy $downloadname "wenquanyi_9pt"
+  SetOutPath $INSTDIR
   Call DownloadInstallZipWithoutSimutrans
   Rename $INSTDIR\wenquanyi_9pt.bdf $INSTDIR\font\wenquanyi_9pt.bdf
   Delete $INSTDIR\wenquanyi_9pt.bdf
@@ -95,13 +122,23 @@ SectionEnd
 SectionGroupEnd
 
 
+Section "Uninstall"
+  SetShellVarContext all
+  Delete $INSTDIR\Uninst.exe ; delete self (see explanation below why this works)
+  Delete "$SMPROGRAMS\Simutrans\Simutrans.lnk"
+  Delete "$SMPROGRAMS\Simutrans\Simutrans (Debug).lnk"
+  Delete $INSTDIR\Uninst.exe ; delete self (see explanation below why this works)
+  RMDir /r $INSTDIR
+  RMDir /r $PAKDIR
+  DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Simutrans"
+SectionEnd
+
 !include "paksets.nsh"
 
 
 ;************************** from here on other helper stuff *****************
 
 !include "other-functions.nsh"
-
 
 ;********************* from here on special own helper functions ************
 
@@ -138,6 +175,12 @@ test_for_pak:
   SectionGetFlags ${pak64contrast} $R0
   IntOp $R0 $R0 & ${SF_SELECTED}
   IntCmp $R0 ${SF_SELECTED} show_not
+  SectionGetFlags ${pak64contrast} $R0
+  IntOp $R0 $R0 & ${SF_SELECTED}
+  IntCmp $R0 ${SF_SELECTED} show_not
+  SectionGetFlags ${pak64scifi} $R0
+  IntOp $R0 $R0 & ${SF_SELECTED}
+  IntCmp $R0 ${SF_SELECTED} show_not
   SectionGetFlags ${pak96comic} $R0
   IntOp $R0 $R0 & ${SF_SELECTED}
   IntCmp $R0 ${SF_SELECTED} show_not
@@ -155,6 +198,9 @@ test_for_pak:
   SectionGetFlags ${pak128german} $R0
   IntOp $R0 $R0 & ${SF_SELECTED}
   IntCmp $R0 ${SF_SELECTED} show_not
+  SectionGetFlags ${pak128cz} $R0
+  IntOp $R0 $R0 & ${SF_SELECTED}
+  IntCmp $R0 ${SF_SELECTED} show_not
   SectionGetFlags ${pak192comic} $R0
   IntOp $R0 $R0 & ${SF_SELECTED}
   IntCmp $R0 ${SF_SELECTED} show_not
@@ -165,7 +211,7 @@ test_for_pak:
   IntOp $R0 $R0 & ${SF_SELECTED}
   IntCmp $R0 ${SF_SELECTED} show_not
   ; not pak selected!
-  MessageBox MB_OK|MB_ICONSTOP "At least on pak set must be selected!"
+  MessageBox MB_OK|MB_ICONSTOP "At least 1 pak set must be selected!" /SD IDOK
 show_not:
 FunctionEnd
 

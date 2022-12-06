@@ -119,8 +119,8 @@ bool goods_manager_t::register_desc(goods_desc_t *desc)
 	::register_desc(special_objects, desc);
 	// avoid duplicates with same name
 	if(  const goods_desc_t *old_desc = desc_table.remove(desc->get_name())  ) {
-		dbg->doubled( "good", desc->get_name() );
 		goods.remove( const_cast<goods_desc_t*>(old_desc) );
+		delete old_desc;
 	}
 	desc_table.put(desc->get_name(), desc);
 

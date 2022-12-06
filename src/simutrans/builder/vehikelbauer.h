@@ -3,8 +3,8 @@
  * (see LICENSE.txt)
  */
 
-#ifndef BAUER_VEHIKELBAUER_H
-#define BAUER_VEHIKELBAUER_H
+#ifndef BUILDER_VEHIKELBAUER_H
+#define BUILDER_VEHIKELBAUER_H
 
 
 #include "../dataobj/koord3d.h"
@@ -48,7 +48,7 @@ public:
 
 	static const char *engine_type_names[9];
 
-	static bool speedbonus_init(const std::string &objfilename);
+	static bool speedbonus_init();
 	static sint32 get_speedbonus( sint32 monthyear, waytype_t wt );
 	static void rdwr_speedbonus(loadsave_t *file);
 

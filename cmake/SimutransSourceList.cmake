@@ -1,5 +1,4 @@
 target_sources(simutrans PRIVATE
-		${CMAKE_SOURCE_DIR}/revision.h
 		src/simutrans/builder/brueckenbauer.cc
 		src/simutrans/builder/fabrikbauer.cc
 		src/simutrans/builder/goods_manager.cc
@@ -18,6 +17,8 @@ target_sources(simutrans PRIVATE
 		src/simutrans/dataobj/loadsave.cc
 		src/simutrans/dataobj/marker.cc
 		src/simutrans/dataobj/objlist.cc
+		src/simutrans/dataobj/pakset_manager.cc
+		src/simutrans/dataobj/pakset_downloader.cc
 		src/simutrans/dataobj/powernet.cc
 		src/simutrans/dataobj/records.cc
 		src/simutrans/dataobj/rect.cc
@@ -177,6 +178,7 @@ target_sources(simutrans PRIVATE
 		src/simutrans/gui/server_frame.cc
 		src/simutrans/gui/settings_frame.cc
 		src/simutrans/gui/settings_stats.cc
+		src/simutrans/gui/signal_info.cc
 		src/simutrans/gui/signal_spacing.cc
 		src/simutrans/gui/simwin.cc
 		src/simutrans/gui/sound_frame.cc
@@ -242,6 +244,7 @@ target_sources(simutrans PRIVATE
 		src/simutrans/player/ai_scripted.cc
 		src/simutrans/player/finance.cc
 		src/simutrans/player/simplay.cc
+		src/simutrans/revision.h
 		src/simutrans/script/api/api_city.cc
 		src/simutrans/script/api/api_command.cc
 		src/simutrans/script/api/api_const.cc
@@ -319,6 +322,7 @@ target_sources(simutrans PRIVATE
 		src/simutrans/world/simcity.cc
 		src/simutrans/world/simplan.cc
 		src/simutrans/world/simworld.cc
+		src/simutrans/world/surface.cc
 		src/simutrans/world/terraformer.cc
 		src/squirrel/sq_extensions.cc
 		src/squirrel/sqstdlib/sqstdaux.cc

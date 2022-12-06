@@ -158,12 +158,14 @@ static char *recode(const char *src, bool translate_from_utf, bool translate_to_
 				}
 				else if(  translate_from_utf  ) {
 					// make latin from UTF8 (ignore overflows!)
+					const utf8 *p = reinterpret_cast<const utf8 *>(src);
 					if(  !is_latin2  ) {
-						*dst++ = c = (uint8)utf8_decoder_t::decode((utf8 const *&)src);
+						*dst++ = c = (uint8)utf8_decoder_t::decode(p);
 					}
 					else {
-						*dst++ = c = unicode_to_latin2(utf8_decoder_t::decode((utf8 const *&)src));
+						*dst++ = c = unicode_to_latin2(utf8_decoder_t::decode(p));
 					}
+					src = reinterpret_cast<const char *>(p);
 				}
 			}
 			else if(c>=13) {
@@ -181,10 +183,6 @@ static char *recode(const char *src, bool translate_from_utf, bool translate_to_
 	return base;
 }
 
-
-
-/* needed for loading city names */
-static char pakset_path[256];
 
 // List of custom city and streetnames
 vector_tpl<char *> translator::city_name_list;
@@ -205,7 +203,7 @@ void translator::load_custom_list( int lang, vector_tpl<char *>&name_list, const
 	// first try in pakset
 	{
 		string local_file_name(env_t::user_dir);
-		local_file_name = local_file_name + "addons/" + pakset_path + "text/" + fileprefix + langs[lang].iso_base + ".txt";
+		local_file_name = local_file_name + "addons/" + env_t::pak_name + "text/" + fileprefix + langs[lang].iso_base + ".txt";
 		DBG_DEBUG("translator::load_custom_list()", "try to read city name list from '%s'", local_file_name.c_str());
 		file = dr_fopen(local_file_name.c_str(), "rb");
 	}
@@ -218,14 +216,13 @@ void translator::load_custom_list( int lang, vector_tpl<char *>&name_list, const
 	}
 	// not found => try pak location
 	if(  file==NULL  ) {
-		string local_file_name(env_t::data_dir);
-		local_file_name = local_file_name + pakset_path + "text/" + fileprefix + langs[lang].iso_base + ".txt";
+		string local_file_name(env_t::pak_name + "text/" + fileprefix + langs[lang].iso_base + ".txt");
 		DBG_DEBUG("translator::load_custom_list()", "try to read city name list from '%s'", local_file_name.c_str());
 		file = dr_fopen(local_file_name.c_str(), "rb");
 	}
 	// not found => try global translations
 	if(  file==NULL  ) {
-		string local_file_name(env_t::data_dir);
+		string local_file_name(env_t::base_dir);
 		local_file_name = local_file_name + "text/" + fileprefix + langs[lang].iso_base + ".txt";
 		DBG_DEBUG("translator::load_custom_list()", "try to read city name list from '%s'", local_file_name.c_str());
 		file = dr_fopen(local_file_name.c_str(), "rb");
@@ -422,17 +419,33 @@ void translator::load_files_from_folder(const char *folder_name, const char *wha
 	const int num_pak_lang_dat = folder.search(folder_name, "tab");
 	DBG_MESSAGE("translator::load_files_from_folder()", "search folder \"%s\" and found %i files", folder_name, num_pak_lang_dat); (void)num_pak_lang_dat;
 
-	//read now the basic language infos
+	// read now the basic language infos
+	// we allow either "LA.*.tab" or "*.LA.tab" whe LA is the ISO language code
 	for(const char* const& filename : folder) {
 		lang_info* lang = NULL;
-		const char* langcode = strrchr(filename,'.');
 
-		if(  langcode  &&  (langcode-filename)>2  ) {
-			// try before the point
-			lang = get_lang_by_iso(langcode-2);
-			if (lang == NULL) {
-				// try instead the start of the string
-				lang = get_lang_by_iso(filename);
+		const char *filestr1 = strrchr(filename, '/');
+		const char *filestr2 = strrchr(filename, '\\');
+		const char *filestr = filestr1 > filestr2 ? filestr1 : filestr2;
+
+		if (filestr) {
+			if(  filestr[3] == '.'  ) {
+				// try the start of the string first
+				lang = get_lang_by_iso(filestr + 1);
+			}
+		}
+		else if(filename[2] == '.') {
+			// try the start of the filename if no path separator found
+			lang = get_lang_by_iso(filename);
+		}
+
+		if (!lang) {
+			const char *langcode = strrchr(filename, '.');
+			if(  langcode  ) {
+				if(  ((langcode - filename) > 3  &&  !isalnum(langcode[-3]))  || (langcode - filename) == -2  ) {
+					// try before the point
+					lang = get_lang_by_iso(langcode - 2);
+				}
 			}
 		}
 
@@ -454,16 +467,14 @@ void translator::load_files_from_folder(const char *folder_name, const char *wha
 }
 
 
-bool translator::load(const string &path_to_pakset)
+bool translator::load()
 {
-	dr_chdir( env_t::data_dir );
-	tstrncpy(pakset_path, path_to_pakset.c_str(), lengthof(pakset_path));
-
 	//initialize these values to 0(ie. nothing loaded)
 	single_instance.current_lang = -1;
 	single_instance.lang_count = 0;
 
 	DBG_MESSAGE("translator::load()", "Loading languages...");
+	dr_chdir( env_t::base_dir );
 	searchfolder_t folder;
 	folder.search("text/", "tab");
 
@@ -495,16 +506,15 @@ bool translator::load(const string &path_to_pakset)
 
 	// now read the pakset specific text
 	// there can be more than one file per language, provided it is name like iso_xyz.tab
-	const string folderName(path_to_pakset + "text/");
-	load_files_from_folder(folderName.c_str(), "pak");
+	load_files_from_folder((env_t::pak_dir+"text"+PATH_SEPARATOR).c_str(), "pak");
 
 	if(  env_t::default_settings.get_with_private_paks()  ) {
 		dr_chdir( env_t::user_dir );
 		// now read the pakset specific text
 		// there can be more than one file per language, provided it is name like iso_xyz.tab
-		const string folderName("addons/" + path_to_pakset + "text/");
+		const string folderName("addons/" + env_t::pak_name + "text/");
 		load_files_from_folder(folderName.c_str(), "pak addons");
-		dr_chdir( env_t::data_dir );
+		dr_chdir( env_t::base_dir );
 	}
 
 	//if NO languages were loaded then game cannot continue
@@ -513,7 +523,7 @@ bool translator::load(const string &path_to_pakset)
 	}
 
 	// now we try to read the compatibility stuff
-	if (FILE* const file = dr_fopen((path_to_pakset + "compat.tab").c_str(), "rb")) {
+	if (FILE* const file = dr_fopen((env_t::pak_dir + "compat.tab").c_str(), "rb")) {
 		load_language_file_body(file, &compatibility, false, false, false );
 		DBG_MESSAGE("translator::load()", "pakset compatibility texts loaded.");
 		fclose(file);
@@ -525,12 +535,12 @@ bool translator::load(const string &path_to_pakset)
 	// also addon compatibility ...
 	if(  env_t::default_settings.get_with_private_paks()  ) {
 		dr_chdir( env_t::user_dir );
-		if (FILE* const file = dr_fopen(string("addons/"+path_to_pakset + "compat.tab").c_str(), "rb")) {
+		if (FILE* const file = dr_fopen(string("addons/"+env_t::pak_name + "compat.tab").c_str(), "rb")) {
 			load_language_file_body(file, &compatibility, false, false, false );
 			DBG_MESSAGE("translator::load()", "pakset addon compatibility texts loaded.");
 			fclose(file);
 		}
-		dr_chdir( env_t::data_dir );
+		dr_chdir( env_t::base_dir );
 	}
 
 	// use english if available
@@ -767,7 +777,7 @@ const char* translator::get_month_date( uint16 month, uint16 day )
 
 const char* translator::get_day_date(uint16 day)
 {
-	char const* const day_sym = strcmp("ORDINAL_DAR_SYMBOL", translate("ORDINAL_DAR_SYMBOL")) ? translate("ORDINAL_DAR_SYMBOL") : "th ";
+	char const* const day_sym = strcmp("ORDINAL_DAY_SYMBOL", translate("ORDINAL_DAY_SYMBOL")) ? translate("ORDINAL_DAY_SYMBOL") : "th ";
 	static char date[256];
 	switch( env_t::show_month ) {
 	case env_t::DATE_FMT_GERMAN:

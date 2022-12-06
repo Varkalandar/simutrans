@@ -12,6 +12,7 @@
 #include "../simhalt.h"
 #include "../simskin.h"
 #include "../ground/grund.h"
+#include "../tool/simtool.h"
 #include "../simfab.h"
 #include "../world/simcity.h"
 #include "fabrik_info.h"
@@ -785,6 +786,175 @@ PIXVAL minimap_t::calc_ground_color(const grund_t *gr)
 }
 
 
+bool minimap_t::calc_map_pixel(const grund_t *gr)
+{
+	if (!gr) {
+		return false;
+	}
+
+	const koord k = gr->get_pos().get_2d();
+
+	if(mode != MAP_PAX_DEST  &&  gr->get_convoi_vehicle()) {
+		set_map_color(k, COL_VEHICLE);
+		return true;
+	}
+
+	switch (mode & ~MAP_MODE_FLAGS) {
+
+		case MAP_PASSENGER:
+		case MAP_MAIL:
+			return false;
+
+		// show usage
+		case MAP_FREIGHT:
+			// need to init the maximum?
+			if (max_cargo == 0) {
+				max_cargo = 1;
+				calc_map();
+				return true;
+			}
+			else if (gr->hat_wege()) {
+				// now calc again ...
+				sint32 cargo = 0;
+
+				// maximum two ways for one ground
+				const weg_t* w = gr->get_weg_nr(0);
+				if (w) {
+					cargo = w->get_statistics(WAY_STAT_GOODS);
+					const weg_t* w = gr->get_weg_nr(1);
+					if (w) {
+						cargo += w->get_statistics(WAY_STAT_GOODS);
+					}
+					if (cargo > max_cargo) {
+						max_cargo = cargo;
+					}
+					set_map_color(k, calc_severity_color_log(cargo, max_cargo));
+					return true;
+				}
+			}
+			break;
+
+		// show traffic (=convois/month)
+		case MAP_TRAFFIC:
+			// need to init the maximum?
+			if (max_passed == 0) {
+				max_passed = 1;
+				calc_map();
+			}
+			else if (gr->hat_wege()) {
+				// now calc again ...
+				sint32 passed = 0;
+
+				// maximum two ways for one ground
+				const weg_t* w = gr->get_weg_nr(0);
+				if (w) {
+					passed = w->get_statistics(WAY_STAT_CONVOIS);
+					if (weg_t* w = gr->get_weg_nr(1)) {
+						passed += w->get_statistics(WAY_STAT_CONVOIS);
+					}
+					if (passed > max_passed) {
+						max_passed = passed;
+					}
+					set_map_color(k, calc_severity_color_log(passed, max_passed));
+					return true;
+				}
+			}
+			break;
+
+		// show tracks: white: no electricity, red: electricity, yellow: signal
+		case MAP_TRACKS:
+			// show track
+			if (gr->hat_weg(track_wt)) {
+				const schiene_t* sch = (const schiene_t*)(gr->get_weg(track_wt));
+				// show signals
+				if (sch->has_sign() || sch->has_signal()) {
+					set_map_color(k, color_idx_to_rgb(COL_YELLOW));
+					return true;
+				}
+				else if (sch->is_electrified()) {
+					set_map_color(k, color_idx_to_rgb(COL_RED));
+					return true;
+				}
+				else {
+					set_map_color(k, color_idx_to_rgb(COL_WHITE));
+					return true;
+				}
+
+			}
+			break;
+
+		// show max speed (if there)
+		case MAX_SPEEDLIMIT:
+			if (gr->get_max_speed()) {
+				set_map_color(k, calc_severity_color(gr->get_max_speed(), 450));
+				return true;
+			}
+			break;
+
+		// find power lines
+		case MAP_POWERLINES:
+			if (const leitung_t* lt = gr->find<leitung_t>()) {
+				const sint32 saturated_demand = std::min<uint64>(lt->get_net()->get_demand(), INT32_MAX);
+				const sint32 saturated_supply = std::min<uint64>(lt->get_net()->get_supply(), INT32_MAX);
+				set_map_color(k, calc_severity_color(saturated_demand, saturated_supply));
+				return true;
+			}
+			break;
+
+		case MAP_FOREST:
+			if (gr->get_top() > 1 && gr->obj_bei(gr->get_top() - 1)->get_typ() == obj_t::baum) {
+				set_map_color(k, color_idx_to_rgb(COL_GREEN));
+				return true;
+			}
+			break;
+
+	case MAP_OWNER:
+		// show ownership
+		if (gr->is_halt()) {
+			set_map_color(k, color_idx_to_rgb(gr->get_halt()->get_owner()->get_player_color1() + 3));
+			return true;
+		}
+		else if (weg_t* weg = gr->get_weg_nr(0)) {
+			set_map_color(k, weg->get_owner() == NULL ? color_idx_to_rgb(COL_ORANGE) : color_idx_to_rgb(weg->get_owner()->get_player_color1() + 3));
+			return true;
+		}
+		if (gebaeude_t* gb = gr->find<gebaeude_t>()) {
+			if (gb->get_owner() != NULL) {
+				set_map_color(k, color_idx_to_rgb(gb->get_owner()->get_player_color1() + 3));
+				return true;
+			}
+		}
+		break;
+
+	case MAP_LEVEL:
+		if (max_building_level == 0) {
+			// init maximum
+			max_building_level = 1;
+			calc_map();
+			return true;
+		}
+		else if (gr->get_typ() == grund_t::fundament) {
+			if (gebaeude_t* gb = gr->find<gebaeude_t>()) {
+				if (gb->is_city_building()) {
+					sint32 level = gb->get_tile()->get_desc()->get_level();
+					if (level > max_building_level) {
+						max_building_level = level;
+					}
+					set_map_color(k, calc_severity_color(level, max_building_level));
+					return true;
+				}
+			}
+		}
+		break;
+
+		default:
+			return false;
+	}
+
+	return false;
+}
+
+
 void minimap_t::calc_map_pixel(const koord k)
 {
 	// no pixels visible, so noting to calculate
@@ -797,25 +967,16 @@ void minimap_t::calc_map_pixel(const koord k)
 	if(plan==NULL  ||  plan->get_boden_count()==0) {
 		return;
 	}
-	const grund_t *gr=plan->get_boden_bei(plan->get_boden_count()-1);
 
-	if(  mode!=MAP_PAX_DEST  &&  gr->get_convoi_vehicle()  ) {
-		set_map_color( k, COL_VEHICLE );
-		return;
-	}
-
-	// first use ground color
-	set_map_color( k, calc_ground_color (gr) );
-
-	switch(mode&~MAP_MODE_FLAGS) {
+	switch (mode & ~MAP_MODE_FLAGS) {
 		// show passenger coverage
 		// display coverage
 		case MAP_PASSENGER:
-			for( int i = 0; i < plan->get_haltlist_count(); i++  ) {
+			for (int i = 0; i < plan->get_haltlist_count(); i++) {
 				halthandle_t halt = plan->get_haltlist()[i];
 				if (halt->get_pax_enabled() && !halt->get_pax_connections().empty()) {
-					set_map_color( k, color_idx_to_rgb(halt->get_owner()->get_player_color1() + 3) );
-					break;
+					set_map_color(k, color_idx_to_rgb(halt->get_owner()->get_player_color1() + 3));
+					return;
 				}
 			}
 			break;
@@ -823,152 +984,61 @@ void minimap_t::calc_map_pixel(const koord k)
 		// show mail coverage
 		// display coverage
 		case MAP_MAIL:
-			for( int i = 0; i < plan->get_haltlist_count(); i++  ) {
+			for (int i = 0; i < plan->get_haltlist_count(); i++) {
 				halthandle_t halt = plan->get_haltlist()[i];
 				if (halt->get_mail_enabled() && !halt->get_mail_connections().empty()) {
-					set_map_color( k, color_idx_to_rgb(halt->get_owner()->get_player_color1() + 3) );
-					break;
+					set_map_color(k, color_idx_to_rgb(halt->get_owner()->get_player_color1() + 3));
+					return;
 				}
 			}
 			break;
+	}
 
-		// show usage
-		case MAP_FREIGHT:
-			// need to init the maximum?
-			if(max_cargo==0) {
-				max_cargo = 1;
-				calc_map();
-			}
-			else if(  gr->hat_wege()  ) {
-				// now calc again ...
-				sint32 cargo=0;
-
-				// maximum two ways for one ground
-				const weg_t *w=gr->get_weg_nr(0);
-				if(w) {
-					cargo = w->get_statistics(WAY_STAT_GOODS);
-					const weg_t *w=gr->get_weg_nr(1);
-					if(w) {
-						cargo += w->get_statistics(WAY_STAT_GOODS);
-					}
-					if(  cargo > max_cargo  ) {
-						max_cargo = cargo;
-					}
-					set_map_color(k, calc_severity_color_log(cargo, max_cargo));
+	if(grund_t::underground_mode == grund_t::ugm_all) {
+		const grund_t* last_tunnel = 0;
+		for (uint8 i = 1; i < plan->get_boden_count(); i++) {
+			const grund_t* gr = plan->get_boden_bei(i);
+			if (gr->get_typ()==grund_t::tunnelboden) {
+				if (calc_map_pixel(gr)) {
+					return;
 				}
+				last_tunnel = gr;
 			}
-			break;
-
-		// show traffic (=convois/month)
-		case MAP_TRAFFIC:
-			// need to init the maximum?
-			if(  max_passed==0  ) {
-				max_passed = 1;
-				calc_map();
+		}
+		if(last_tunnel) {
+			set_map_color(k, calc_ground_color(last_tunnel));
+		}
+		else {
+			set_map_color(k, color_idx_to_rgb(COL_BLACK));
+		}
+	}
+	else if(grund_t::underground_mode == grund_t::ugm_level) {
+		for (uint8 i = 0; i < plan->get_boden_count(); i++) {
+			const grund_t* gr = plan->get_boden_bei(i);
+			if ((gr->get_hoehe() == grund_t::underground_level  ||  (i==0  && gr->get_hoehe() == grund_t::underground_level))  &&  calc_map_pixel(gr)) {
+				return;
 			}
-			else if(gr->hat_wege()) {
-				// now calc again ...
-				sint32 passed=0;
-
-				// maximum two ways for one ground
-				const weg_t *w=gr->get_weg_nr(0);
-				if(w) {
-					passed = w->get_statistics(WAY_STAT_CONVOIS);
-					if(  weg_t *w=gr->get_weg_nr(1)  ) {
-						passed += w->get_statistics(WAY_STAT_CONVOIS);
-					}
-					if(  passed > max_passed  ) {
-						max_passed = passed;
-					}
-					set_map_color(k, calc_severity_color_log( passed, max_passed ) );
-				}
+		}
+		grund_t* gr = plan->get_boden_in_hoehe(grund_t::underground_level);
+		if (!gr) {
+			gr = plan->get_kartenboden();
+		}
+		if (gr->get_hoehe() <= grund_t::underground_level) {
+			set_map_color(k, calc_ground_color(gr));
+		}
+		else {
+			set_map_color(k, color_idx_to_rgb(COL_BLACK));
+		}
+	}
+	else {
+		for (uint8 i = 0; i < plan->get_boden_count(); i++) {
+			const grund_t* gr = plan->get_boden_bei(i);
+			if (calc_map_pixel(gr)) {
+				return;
 			}
-			break;
-
-		// show tracks: white: no electricity, red: electricity, yellow: signal
-		case MAP_TRACKS:
-			// show track
-			if (gr->hat_weg(track_wt)) {
-				const schiene_t * sch = (const schiene_t *) (gr->get_weg(track_wt));
-				if(sch->is_electrified()) {
-					set_map_color(k, color_idx_to_rgb(COL_RED));
-				}
-				else {
-					set_map_color(k, color_idx_to_rgb(COL_WHITE));
-				}
-				// show signals
-				if(sch->has_sign()  ||  sch->has_signal()) {
-					set_map_color(k, color_idx_to_rgb(COL_YELLOW));
-				}
-			}
-			break;
-
-		// show max speed (if there)
-		case MAX_SPEEDLIMIT:
-			{
-				sint32 speed=gr->get_max_speed();
-				if(speed) {
-					set_map_color(k, calc_severity_color(gr->get_max_speed(), 450));
-				}
-			}
-			break;
-
-		// find power lines
-		case MAP_POWERLINES:
-			{
-				const leitung_t* lt = gr->find<leitung_t>();
-				if(lt!=NULL) {
-					const sint32 saturated_demand = std::min<uint64>(lt->get_net()->get_demand(), INT32_MAX);
-					const sint32 saturated_supply = std::min<uint64>(lt->get_net()->get_supply(), INT32_MAX);
-					set_map_color(k, calc_severity_color(saturated_demand, saturated_supply) );
-				}
-			}
-			break;
-
-		case MAP_FOREST:
-			if(  gr->get_top()>1  &&  gr->obj_bei(gr->get_top()-1)->get_typ()==obj_t::baum  ) {
-				set_map_color(k, color_idx_to_rgb(COL_GREEN) );
-			}
-			break;
-
-		case MAP_OWNER:
-			// show ownership
-			{
-				if(  gr->is_halt()  ) {
-					set_map_color(k, color_idx_to_rgb(gr->get_halt()->get_owner()->get_player_color1()+3));
-				}
-				else if(  weg_t *weg = gr->get_weg_nr(0)  ) {
-					set_map_color(k, weg->get_owner()==NULL ? color_idx_to_rgb(COL_ORANGE) : color_idx_to_rgb(weg->get_owner()->get_player_color1()+3) );
-				}
-				if(  gebaeude_t *gb = gr->find<gebaeude_t>()  ) {
-					if(  gb->get_owner()!=NULL  ) {
-						set_map_color(k, color_idx_to_rgb(gb->get_owner()->get_player_color1()+3) );
-					}
-				}
-				break;
-			}
-
-		case MAP_LEVEL:
-			if(  max_building_level == 0  ) {
-				// init maximum
-				max_building_level = 1;
-				calc_map();
-			}
-			else if(  gr->get_typ() == grund_t::fundament  ) {
-				if(  gebaeude_t *gb = gr->find<gebaeude_t>()  ) {
-					if(  gb->is_city_building()  ) {
-						sint32 level = gb->get_tile()->get_desc()->get_level();
-						if(  level > max_building_level  ) {
-							max_building_level = level;
-						}
-						set_map_color(k, calc_severity_color( level, max_building_level ) );
-					}
-				}
-			}
-			break;
-
-		default:
-			break;
+		}
+		// Nothing special => calculate ground color based on last index
+		set_map_color(k, calc_ground_color(plan->get_boden_bei(plan->get_boden_count() - 1)));
 	}
 }
 
@@ -1152,8 +1222,8 @@ const fabrik_t* minimap_t::draw_factory_connections(const fabrik_t* const fab, b
 	if(fab) {
 		PIXVAL color = supplier_link ? color_idx_to_rgb(COL_RED) : color_idx_to_rgb(COL_WHITE);
 		scr_coord fabpos = map_to_screen_coord( fab->get_pos().get_2d() ) + pos;
-		const vector_tpl<koord>& lieferziele = supplier_link ? fab->get_suppliers() : fab->get_lieferziele();
-		for(koord lieferziel : lieferziele) {
+		const vector_tpl<koord>& consumer = supplier_link ? fab->get_suppliers() : fab->get_consumer();
+		for(koord lieferziel : consumer) {
 			const fabrik_t * fab2 = fabrik_t::get_fab(lieferziel);
 			if (fab2) {
 				const scr_coord end = map_to_screen_coord( lieferziel ) + pos;
@@ -1202,6 +1272,11 @@ void minimap_t::draw(scr_coord pos)
 		if(  (mode & MAP_LINES) == 0  ||  (mode^last_mode) & MAP_MODE_HALT_FLAGS  ) {
 			// rebuilt stop_cache needed
 			stop_cache.clear();
+			if(  (mode & MAP_LINES)  &&  (last_mode & MAP_LINES)  &&  current_cnv.is_bound()  ) {
+				schedule_cache.clear();
+				add_to_schedule_cache(current_cnv, true);
+				needs_redraw = true;
+			}
 		}
 
 		if(  (mode & MAP_LINES)  &&  (last_mode & MAP_LINES) == 0  &&  current_cnv.is_bound()  ) {
@@ -1402,7 +1477,7 @@ void minimap_t::draw(scr_coord pos)
 		for(line_segment_t seg : schedule_cache  ) {
 
 			uint8 color = seg.colorcount;
-			if(  event_get_last_control_shift()==2  ||  current_cnv.is_bound()  ) {
+			if(  (event_get_last_control_shift() ^ tool_t::control_invert)==2  ||  current_cnv.is_bound()  ) {
 				// on control / single convoi use only player colors
 				static uint8 last_color = color;
 				color = seg.player->get_player_color1()+1;
@@ -1534,7 +1609,7 @@ void minimap_t::draw(scr_coord pos)
 				}
 			}
 			// with control, show only circles
-			if(  event_get_last_control_shift()!=2  ) {
+			if((event_get_last_control_shift() ^ tool_t::control_invert)==2) {
 				// else elongate them ...
 				const int key = station->get_basis_pos().x + station->get_basis_pos().y * world->get_size().x;
 				diagonal_dist = waypoint_hash.get( key ).get_count();
@@ -1616,6 +1691,7 @@ void minimap_t::draw(scr_coord pos)
 
 	// draw city limit
 	if(  mode & MAP_CITYLIMIT  ) {
+		const PIXVAL col = color_idx_to_rgb(showing_schedule ? COL_DARK_BROWN : COL_ORANGE);
 
 		// for all cities
 		for(stadt_t* const stadt :  world->get_cities()  ) {
@@ -1635,10 +1711,10 @@ void minimap_t::draw(scr_coord pos)
 				c[i] = map_to_screen_coord(k[i]) + pos;
 			}
 
-			display_direct_line_dotted_rgb( c[0].x, c[0].y, c[1].x, c[1].y, 3, 3, color_idx_to_rgb(COL_ORANGE) );
-			display_direct_line_dotted_rgb( c[1].x, c[1].y, c[2].x, c[2].y, 3, 3, color_idx_to_rgb(COL_ORANGE) );
-			display_direct_line_dotted_rgb( c[2].x, c[2].y, c[3].x, c[3].y, 3, 3, color_idx_to_rgb(COL_ORANGE) );
-			display_direct_line_dotted_rgb( c[3].x, c[3].y, c[0].x, c[0].y, 3, 3, color_idx_to_rgb(COL_ORANGE) );
+			display_direct_line_dotted_rgb( c[0].x, c[0].y, c[1].x, c[1].y, 3, 3, col );
+			display_direct_line_dotted_rgb( c[1].x, c[1].y, c[2].x, c[2].y, 3, 3, col );
+			display_direct_line_dotted_rgb( c[2].x, c[2].y, c[3].x, c[3].y, 3, 3, col );
+			display_direct_line_dotted_rgb( c[3].x, c[3].y, c[0].x, c[0].y, 3, 3, col );
 		}
 	}
 
@@ -1729,7 +1805,7 @@ void minimap_t::draw(scr_coord pos)
 		c[i] = map_to_screen_coord( view[i] ) + pos;
 	}
 	for(  int i=0;  i<4;  i++  ) {
-		display_direct_line_rgb( c[i].x, c[i].y, c[(i+1)%4].x, c[(i+1)%4].y, color_idx_to_rgb(COL_YELLOW));
+		display_direct_line_rgb( c[i].x, c[i].y, c[(i+1)%4].x, c[(i+1)%4].y, color_idx_to_rgb(showing_schedule?COL_RED:COL_YELLOW));
 	}
 
 	if(  !showing_schedule  ) {
@@ -1748,13 +1824,14 @@ void minimap_t::draw(scr_coord pos)
 			display_ddd_proportional_clip(boxpos.x, boxpos.y, color_idx_to_rgb(10), color_idx_to_rgb(COL_WHITE), name, true);
 		}
 
-		for (uint32 i = 0; i < win_get_open_count(); i++) {
+		for (int i = win_get_open_count() - 1; i >= 0; i--) {
 			gui_frame_t *g = win_get_index(i);
 			if(g->get_rdwr_id()== magic_factory_info) {
 				// is a factory info window
 				const fabrik_t * const fab = dynamic_cast<fabrik_info_t *>(g)->get_factory();
 				draw_factory_connections(fab, true, pos);
 				draw_factory_connections(fab, false, pos);
+				break; // only show top window
 			}
 		}
 

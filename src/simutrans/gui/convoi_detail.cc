@@ -15,6 +15,7 @@
 #include "../simcolor.h"
 #include "../world/simworld.h"
 #include "../simware.h"
+#include "../simintr.h"
 
 #include "../dataobj/translator.h"
 #include "../dataobj/loadsave.h"
@@ -72,6 +73,12 @@ public:
 				l->update();
 			}
 			end_table();
+			// loading time
+			if (v->get_desc()->get_capacity() > 0) {
+				l = new_component<gui_label_buf_t>();
+				l->buf().printf("%s%s", translator::translate("Loading time:"), difftick_to_string(v->get_desc()->get_loading_time(),false) );
+				l->update();
+			}
 			// power
 			if(v->get_desc()->get_power()>0) {
 				l = new_component<gui_label_buf_t>();
@@ -183,7 +190,7 @@ void convoi_detail_t::update_labels()
 		label_length.buf().printf( "%s %i", translator::translate( "Vehicle count:" ), cnv->get_vehicle_count() );
 	}
 	else {
-		label_length.buf().printf( "%s %i %s %i", translator::translate( "Vehicle count:" ), cnv->get_vehicle_count(), translator::translate( "Station tiles:" ), cnv->get_tile_length() );
+		label_length.buf().printf( "%s %i %s %s %i %s", translator::translate( "Vehicle count:" ), cnv->get_vehicle_count(), "(", translator::translate( "Station tiles:" ), cnv->get_tile_length(), ")");
 	}
 	label_length.update();
 	label_resale.buf().printf("%s ", translator::translate("Restwert:"));

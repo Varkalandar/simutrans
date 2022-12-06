@@ -113,11 +113,6 @@ private:
 	sint32 traffic_level;
 
 	/**
-	 * Should pedestrians be displayed?
-	 */
-	sint32 show_pax;
-
-	/**
 	 * the maximum and minimum allowed world height.
 	 */
 	sint8 world_maximum_height;
@@ -210,11 +205,6 @@ private:
 	/* crossconnect all factories (like OTTD and similar games) */
 	sint16 crossconnect_factor;
 
-	/**
-	* Generate random pedestrians in the cities?
-	*/
-	bool random_pedestrians;
-
 	sint32 stadtauto_duration;
 
 	bool freeplay;
@@ -282,8 +272,8 @@ private:
 	// lowest possible income with speedbonus (1000=1) default 125
 	sint32 bonus_basefactor;
 
-	// true, if this pak should be used with extensions (default)
-	bool with_private_paks;
+	// true, if this pak should be used with extensions (default=false)
+	bool with_private_paks = false;
 
 	/// what is the minimum clearance required under bridges
 	uint8 way_height_clearance;
@@ -424,9 +414,6 @@ public:
 	void set_traffic_level(sint32 l) {traffic_level=l;}
 	sint32 get_traffic_level() const {return traffic_level;}
 
-	void set_show_pax(bool yesno) {show_pax=yesno;}
-	bool get_show_pax() const {return show_pax != 0;}
-
 	sint8 get_maximumheight() const { return world_maximum_height; }
 	sint8 get_minimumheight() const { return world_minimum_height; }
 
@@ -487,9 +474,6 @@ public:
 
 	sint64 get_starting_money(sint16 year) const;
 
-	bool get_random_pedestrians() const { return random_pedestrians; }
-	void set_random_pedestrians( bool f ) { random_pedestrians = f; }
-
 	sint16 get_special_building_distance() const { return special_building_distance; }
 
 	sint16 get_min_factory_spacing() const { return min_factory_spacing; }
@@ -541,7 +525,7 @@ public:
 	sint16 get_max_river_length() const { return max_river_length; }
 
 	// true, if this pak should be used with extensions (default)
-	void set_with_private_paks(bool b ) {with_private_paks = b;}
+	void set_with_private_paks(bool b ) { with_private_paks = b; }
 	bool get_with_private_paks() const { return with_private_paks; }
 
 	sint32 get_passenger_factor() const { return passenger_factor; }

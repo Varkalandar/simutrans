@@ -154,6 +154,14 @@ public:
 		return scr_size(0,0);
 	}
 
+	/**
+	 * Get this component's minimal bounding box size when inside a scrollpane.
+	 * Elements will be as least as small.
+	 */
+	virtual scr_size get_min_scroll_size() const {
+		return scr_size(0,0);
+	}
+
 
 	/**
 	 * Checks if the given position is inside the component area.
@@ -196,12 +204,15 @@ public:
 	}
 
 	/**
-	 * Align this component against a target component
+	 * Align this component against a target component:
+	 * place it:
+	 *  - right of the target
+	 *  - centered vertically
+	 * Offset will be added.
 	 * @param component_par the component to align against
-	 * @param alignment_par the requested alignment
 	 * @param offset_par Offset added to final alignment
 	 */
-	void align_to(gui_component_t* component_par, control_alignment_t alignment_par, scr_coord offset_par = scr_coord(0,0) );
+	void align_to(gui_component_t* component_par, scr_coord offset_par = scr_coord(0,0) );
 
 	/**
 	 * @returns bounding box position and size.

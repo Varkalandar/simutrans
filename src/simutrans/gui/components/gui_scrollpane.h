@@ -20,24 +20,30 @@ class gui_scrollpane_t : public gui_component_t
 private:
 	scr_size old_comp_size;
 
-	/**
-	 * Scrollbar X/Y
-	 */
-	scrollbar_t scroll_x, scroll_y;
-
 	bool b_show_scroll_x:1;
 	bool b_show_scroll_y:1;
 	bool b_has_size_corner:1;
 	bool maximize:1;
+	bool b_can_drag:1;
+	bool b_is_dragging:1;
 
-	// for oversized entries
-	scr_coord_val max_width;
+	// start of dragging
+	scr_coord origin;
 
 protected:
 	/**
 	 * The scrolling component
 	 */
 	gui_component_t *comp;
+
+	/**
+	 * Scrollbar X/Y
+	 */
+	scrollbar_t scroll_x, scroll_y;
+
+	// for oversized entries
+	scr_coord_val max_width;
+	scr_coord_val max_height;
 
 	void recalc_sliders(scr_size size);
 
@@ -48,6 +54,8 @@ public:
 	gui_scrollpane_t(gui_component_t *comp, bool b_scroll_x = false, bool b_scroll_y = true);
 
 	void set_component(gui_component_t *comp) { this->comp = comp; }
+
+	void set_allow_dragging(bool b) { b_can_drag = b;  }
 
 	/**
 	* this is the maximum width a scrollbar requests as minimum size

@@ -47,6 +47,9 @@
 
 karte_ptr_t tool_t::welt;
 
+// emulate control key by tool
+uint8 tool_t::control_invert = 0;
+
 // for key lookup; is always sorted during the game
 vector_tpl<tool_t *>tool_t::char_to_tool(0);
 
@@ -212,9 +215,8 @@ public:
 	tool_dummy_t() : tool_t(dummy_id) {}
 
 	bool init(player_t*) OVERRIDE { return false; }
-	bool is_init_network_safe() const OVERRIDE { return true; }
-	bool is_work_network_safe() const OVERRIDE { return true; }
-	bool is_move_network_safe(player_t*) const OVERRIDE { return true; }
+	bool is_init_keeps_game_state() const OVERRIDE { return true; }
+	bool is_work_keeps_game_state() const OVERRIDE { return true; }
 };
 tool_t *tool_t::dummy = new tool_dummy_t();
 
@@ -268,6 +270,7 @@ tool_t *create_general_tool(int toolnr)
 		case TOOL_EXEC_TWO_CLICK_SCRIPT:       tool = new tool_exec_two_click_script_t(); break;
 		case TOOL_PLANT_GROUNDOBJ:             tool = new tool_plant_groundobj_t();     break;
 		case TOOL_ADD_MESSAGE:                 tool = new tool_add_message_t();         break;
+		case TOOL_REMOVE_SIGNAL:               tool = new tool_remove_signal_t();       break;
 		default:
 			dbg->error("create_general_tool()","cannot satisfy request for general_tool[%i]!",toolnr);
 			return NULL;
@@ -321,6 +324,8 @@ tool_t *create_simple_tool(int toolnr)
 		case TOOL_ROLLUP_ALL_WIN:       tool = new tool_rollup_all_win_t();       break;
 		case TOOL_RECOLOUR_TOOL:        tool = new tool_recolour_t();             break;
 		case TOOL_SHOW_FACTORY_STORAGE: tool = new tool_show_factory_storage_t(); break;
+		case TOOL_TOGGLE_CONTROL:       tool = new tool_toggle_control_t();       break;
+		case TOOL_LOAD_SCENARIO:        tool = new tool_load_scenario_t();        break;
 		case UNUSED_TOOL_ADD_MESSAGE: // fall-through - intended!!!111elf
 		case UNUSED_WKZ_PWDHASH_TOOL:
 			dbg->warning("create_simple_tool()", "Deprecated tool [%i] requested", toolnr);
@@ -1176,9 +1181,24 @@ bool toolbar_t::init(player_t *player)
 		return false;
 	}
 
-	if(  this != tool_t::toolbar_tool[0]  ) {
-		// not main menu
-		create_win( tool_selector, w_info|w_do_not_delete|w_no_overlap, magic_toolbar+toolbar_tool.index_of(this) );
+	if(  this!=tool_t::toolbar_tool[0]  ) {
+		if(env_t::single_toolbar_mode) {
+			for(  uint16 i=1;  i<toolbar_tool.get_count();  i++  ) {
+				if(  this!=toolbar_tool[i]  ) {
+					// make sure only one tool is visibile
+					destroy_win( magic_toolbar+i );
+				}
+			}
+			// open toolbar centered at top or bottom position (bottom, when menubar at bottom)
+			scr_coord_val w = display_get_width() - (env_t::menupos == MENU_LEFT ? env_t::iconsize.w : 0) - (env_t::menupos == MENU_RIGHT ? env_t::iconsize.w : 0);
+			scr_coord_val x = (w-tool_selector->get_windowsize().w)/2+(env_t::menupos == MENU_LEFT ? env_t::iconsize.w : 0);
+			scr_coord_val y = (env_t::menupos == MENU_BOTTOM ? display_get_height()-tool_selector->get_windowsize().h-env_t::iconsize.h : 0);
+			create_win( x, y, tool_selector, w_do_not_delete, magic_toolbar+toolbar_tool.index_of(this) );
+		}
+		else {
+			// not main menu => open random
+			create_win( tool_selector, w_info|w_do_not_delete|w_no_overlap, magic_toolbar+toolbar_tool.index_of(this) );
+		}
 		DBG_MESSAGE("toolbar_t::init()", "ID=%id", get_id());
 	}
 	return false;
@@ -1288,14 +1308,14 @@ bool two_click_tool_t::is_first_click() const
 }
 
 
-bool two_click_tool_t::is_work_here_network_safe(player_t *player, koord3d pos )
+bool two_click_tool_t::is_work_here_keeps_game_state(player_t *player, koord3d pos )
 {
 	if(  !is_first_click()  ) {
 		return false;
 	}
 	const char *error = ""; //default: nosound
 	uint8 value = is_valid_pos( player, pos, error, koord3d::invalid );
-	DBG_MESSAGE("two_click_tool_t::is_work_here_network_safe", "Position %s valid=%d", pos.get_str(), value );
+	DBG_MESSAGE("two_click_tool_t::is_work_here_keeps_game_state", "Position %s valid=%d", pos.get_str(), value );
 	if(  value == 0  ) {
 		// cannot work here at all -> safe
 		return true;

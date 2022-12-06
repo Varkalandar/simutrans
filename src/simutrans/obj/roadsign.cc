@@ -23,6 +23,7 @@
 #include "../dataobj/scenario.h"
 #include "../dataobj/translator.h"
 #include "../dataobj/environment.h"
+#include "../dataobj/pakset_manager.h"
 
 #include "../gui/trafficlight_info.h"
 #include "../gui/privatesign_info.h"
@@ -35,6 +36,7 @@
 
 #include "roadsign.h"
 
+freelist_tpl<roadsign_t> roadsign_t::rs;
 
 const roadsign_desc_t *roadsign_t::default_signal=NULL;
 
@@ -61,7 +63,7 @@ roadsign_t::roadsign_t(loadsave_t *file) : obj_t ()
 	}
 	// only traffic light need switches
 	if(  automatic  ) {
-		welt->sync.add(this);
+		welt->sync_roadsigns.add(this);
 	}
 }
 
@@ -93,7 +95,7 @@ roadsign_t::roadsign_t(player_t *player, koord3d pos, ribi_t::ribi dir, const ro
 	automatic = (desc->get_count()>4  &&  desc->get_wtyp()==road_wt)  ||  (desc->get_count()>2  &&  desc->is_private_way());
 	// only traffic light need switches
 	if(  automatic  ) {
-		welt->sync.add(this);
+		welt->sync_roadsigns.add(this);
 	}
 }
 
@@ -119,7 +121,7 @@ roadsign_t::~roadsign_t()
 		}
 	}
 	if(automatic) {
-		welt->sync.remove(this);
+		welt->sync_roadsigns.remove(this);
 	}
 }
 
@@ -612,7 +614,7 @@ void roadsign_t::rdwr(loadsave_t *file)
 			desc = roadsign_t::table.get(translator::compatibility_name(bname));
 			if(  desc==NULL  ) {
 				dbg->warning("roadsign_t::rwdr", "description %s for roadsign/signal at %d,%d not found! (may be ignored)", bname, get_pos().x, get_pos().y);
-				welt->add_missing_paks( bname, karte_t::MISSING_SIGN );
+				pakset_manager_t::add_missing_paks( bname, MISSING_SIGN );
 			}
 			else {
 				dbg->warning("roadsign_t::rwdr", "roadsign/signal %s at %d,%d replaced by %s", bname, get_pos().x, get_pos().y, desc->get_name() );
@@ -682,7 +684,6 @@ bool roadsign_t::register_desc(roadsign_desc_t *desc)
 {
 	// avoid duplicates with same name
 	if(const roadsign_desc_t *old_desc = table.remove(desc->get_name())) {
-		dbg->doubled( "roadsign", desc->get_name() );
 		tool_t::general_tool.remove( old_desc->get_builder() );
 		delete old_desc->get_builder();
 		delete old_desc;

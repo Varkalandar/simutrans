@@ -7,9 +7,6 @@
 #include <SDL2/SDL.h>
 #else
 #include <SDL.h>
-extern "C" {
-	#include "../../OSX/translocation.h"
-}
 #endif
 
 #ifdef _WIN32
@@ -140,6 +137,9 @@ sint32 y_scale = SCALE_NEUTRAL_Y;
 // make sure we have at least so much pixel in y-direction
 #define MIN_SCALE_HEIGHT (640)
 
+// Most Android devices are underpowered to handle larger screens
+#define MAX_AUTOSCALE_WIDTH (1280)
+
 // screen -> texture coords
 #define SCREEN_TO_TEX_X(x) (((x) * SCALE_NEUTRAL_X) / x_scale)
 #define SCREEN_TO_TEX_Y(y) (((y) * SCALE_NEUTRAL_Y) / y_scale)
@@ -157,28 +157,39 @@ bool dr_set_screen_scale(sint16 scale_percent)
 	const sint32 old_x_scale = x_scale;
 	const sint32 old_y_scale = y_scale;
 
-	if(  scale_percent == -1  ) {
-#if SDL_VERSION_ATLEAST(2,0,4)
+	if (scale_percent == -1) {
 		float hdpi, vdpi;
-		SDL_Init( SDL_INIT_VIDEO );
 		SDL_DisplayMode mode;
 		SDL_GetCurrentDisplayMode(0, &mode);
 		DBG_MESSAGE("dr_auto_scale", "screen resolution width=%d, height=%d", mode.w, mode.h);
-		// auto scale only for high enough screens
 
-		if(  mode.h > 1.5*MIN_SCALE_HEIGHT  &&  SDL_GetDisplayDPI( 0, NULL, &hdpi, &vdpi )==0  ) {
+#if SDL_VERSION_ATLEAST(2,0,4)
+		// auto scale only for high enough screens
+		if (mode.h > 1.5 * MIN_SCALE_HEIGHT && SDL_GetDisplayDPI(0, NULL, &hdpi, &vdpi) == 0) {
 
 			x_scale = ((sint64)hdpi * SCALE_NEUTRAL_X + 1) / TARGET_DPI;
 			y_scale = ((sint64)vdpi * SCALE_NEUTRAL_Y + 1) / TARGET_DPI;
-			DBG_MESSAGE("auto_dpi_scaling","x=%i, y=%i", x_scale, y_scale);
+			DBG_MESSAGE("auto_dpi_scaling", "x=%i, y=%i", x_scale, y_scale);
 		}
 
+#ifdef __ANDROID__
+		// most Android are underpowered to run more than 1280 pixel horizontal
+		sint32 current_x = SCREEN_TO_TEX_X(mode.w);
+		if (current_x > MAX_AUTOSCALE_WIDTH) {
+			sint32 new_x_scale = ((sint64)mode.w * SCALE_NEUTRAL_X + 1) / MAX_AUTOSCALE_WIDTH;
+			y_scale = (y_scale * new_x_scale) / x_scale;
+			x_scale = new_x_scale;
+			DBG_MESSAGE("new scaling (max 1280)", "x=%i, y=%i", x_scale, y_scale);
+	}
+#endif
+
+		// ensure minimum height
 		sint32 current_y = SCREEN_TO_TEX_Y(mode.h);
 		if (current_y < MIN_SCALE_HEIGHT) {
 			DBG_MESSAGE("dr_auto_scale", "virtual height=%d < %d", current_y, MIN_SCALE_HEIGHT);
 			x_scale = (x_scale * current_y) / MIN_SCALE_HEIGHT;
 			y_scale = (y_scale * current_y) / MIN_SCALE_HEIGHT;
-			DBG_MESSAGE("new scaling", "x=%i, y=%i", x_scale, y_scale);
+			DBG_MESSAGE("new scaling (min 640)", "x=%i, y=%i", x_scale, y_scale);
 		}
 #else
 #pragma message "SDL version must be at least 2.0.4 to support autoscaling."
@@ -224,7 +235,7 @@ sint16 dr_get_screen_scale()
 
 static int SDLCALL my_event_filter(void* /*userdata*/, SDL_Event* event)
 {
-	DBG_MESSAGE("my_event_filter", "%i", event->type);
+	DBG_DEBUG4("my_event_filter", "%i", event->type);
 	switch (event->type)
 	{
 	case SDL_APP_DIDENTERBACKGROUND:
@@ -253,7 +264,7 @@ static int SDLCALL my_event_filter(void* /*userdata*/, SDL_Event* event)
 
 			// construct from pak name an autosave if requested
 			std::string pak_name("autosave-");
-			pak_name.append(env_t::objfilename);
+			pak_name.append(env_t::pak_name);
 			pak_name.erase(pak_name.length() - 1);
 			pak_name.append(".sve");
 
@@ -295,6 +306,8 @@ bool dr_os_init(const int* parameter)
 		dbg->error("dr_os_init(SDL2)", "Could not initialize SDL: %s", SDL_GetError() );
 		return false;
 	}
+
+	SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight Portrait PortraitUpsideDown");
 
 	dbg->message("dr_os_init(SDL2)", "SDL Driver: %s", SDL_GetCurrentVideoDriver() );
 
@@ -448,6 +461,10 @@ int dr_os_open(const scr_size window_size, sint16 fs)
 	// SDL2 only works with borderless fullscreen (SDL_WINDOW_FULLSCREEN_DESKTOP)
 	Uint32 flags = fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : SDL_WINDOW_RESIZABLE;
 	flags |= SDL_WINDOW_ALLOW_HIGHDPI; // apparently needed for Apple retina displays
+#ifdef __ANDROID__
+	// needed for landscape apparently
+	flags |= SDL_WINDOW_RESIZABLE;
+#endif
 
 	window = SDL_CreateWindow( SIM_TITLE, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, window_size.w, window_size.h, flags );
 	if(  window == NULL  ) {
@@ -644,6 +661,7 @@ static void internal_GetEvents()
 	static double dLastDist = 0.0;
 
 	static bool has_queued_finger_release = false;
+	static bool has_queued_zero_mouse_move = false;
 	static sint32 last_mx, last_my; // last finger down pos
 
 	if (has_queued_finger_release) {
@@ -659,6 +677,19 @@ static void internal_GetEvents()
 		return;
 	}
 
+	if (has_queued_zero_mouse_move) {
+		// we need to send a finger release, which was not done yet
+		has_queued_zero_mouse_move = false;
+		sys_event.type = SIM_MOUSE_MOVE;
+		sys_event.code = 0;
+		sys_event.mb = 0;
+		sys_event.mx = last_mx;
+		sys_event.my = last_my;
+		sys_event.key_mod = ModifierKeys();
+		DBG_MESSAGE("SDL_FINGERUP for queue", "SIM_MOUSE_MOVE at %i,%i", sys_event.mx, sys_event.my);
+		return;
+	}
+
 	SDL_Event event;
 	event.type = 1;
 	if (SDL_PollEvent(&event) == 0) {
@@ -666,7 +697,7 @@ static void internal_GetEvents()
 	}
 
 	static char textinput[SDL_TEXTINPUTEVENT_TEXT_SIZE];
-	DBG_MESSAGE("SDL_EVENT", "0x%X", event.type);
+	DBG_DEBUG4("SDL_EVENT", "0x%X", event.type);
 
 	switch(  event.type  ) {
 
@@ -733,7 +764,7 @@ static void internal_GetEvents()
 				sys_event.code = SIM_MOUSE_MOVED;
 				sys_event.mx = SCREEN_TO_TEX_X(event.motion.x);
 				sys_event.my = SCREEN_TO_TEX_Y(event.motion.y);
-				sys_event.mb = conv_mouse_buttons(event.motion.state);
+				sys_event.mb = conv_mouse_buttons( SDL_GetMouseState(0, 0) );
 				sys_event.key_mod = ModifierKeys();
 			}
 			break;
@@ -749,6 +780,7 @@ static void internal_GetEvents()
 				FirstFingerId = event.tfinger.fingerId;
 				DBG_MESSAGE("SDL_FINGERDOWN", "FirstfingerID=%x", FirstFingerId);
 				in_finger_handling = true;
+				previous_multifinger_touch = 0;
 			}
 			else if (FirstFingerId != event.tfinger.fingerId) {
 				previous_multifinger_touch = 2;
@@ -765,6 +797,7 @@ static void internal_GetEvents()
 					sys_event.code = SIM_MOUSE_LEFTBUTTON;
 					sys_event.mx = event.tfinger.x * display_get_width();
 					sys_event.my = event.tfinger.y * display_get_height();
+					previous_multifinger_touch = 0;
 	DBG_MESSAGE("SDL_FINGERMOTION", "SIM_MOUSE_LEFTBUTTON at %i,%i", sys_event.mx, sys_event.my);
 				}
 				else {
@@ -809,9 +842,15 @@ static void internal_GetEvents()
 		DBG_MESSAGE("SDL_FINGERUP", "SIM_MOUSE_LEFTUP at %i,%i", sys_event.mx, sys_event.my);
 						}
 					}
+					else {
+		DBG_MESSAGE("SDL_FINGERUP", "ignored at %i,%i because previous_multifinger_touch>0", sys_event.mx, sys_event.my);
+					}
 					previous_multifinger_touch = 0;
 					in_finger_handling = 0;
 					FirstFingerId = 0xFFFF;
+				}
+				else {
+		DBG_MESSAGE("SDL_FINGERUP", "ignored at %i,%i beacuse FirstFingerId(%xd)!=event.tfinger.fingerId(%xd) &&  SDL_GetNumTouchFinger()=%d", sys_event.mx, sys_event.my,FirstFingerId, event.tfinger.fingerId,SDL_GetNumTouchFingers(event.tfinger.touchId));
 				}
 			}
 			break;
@@ -879,11 +918,11 @@ static void internal_GetEvents()
 			bool np = false; // to indicate we converted a numpad key
 
 			switch(  sym  ) {
-				case SDLK_AC_BACK:
 				case SDLK_BACKSPACE:  code = SIM_KEY_BACKSPACE;             break;
 				case SDLK_TAB:        code = SIM_KEY_TAB;                   break;
 				case SDLK_RETURN:     code = SIM_KEY_ENTER;                 break;
 				case SDLK_ESCAPE:     code = SIM_KEY_ESCAPE;                break;
+				case SDLK_AC_BACK:
 				case SDLK_DELETE:     code = SIM_KEY_DELETE;                break;
 				case SDLK_DOWN:       code = SIM_KEY_DOWN;                  break;
 				case SDLK_END:        code = SIM_KEY_END;                   break;
@@ -1142,12 +1181,6 @@ int main(int argc, char **argv)
 #ifdef _WIN32
 	int    const argc = __argc;
 	char** const argv = __argv;
-#endif
-#ifdef __APPLE__
-	if (RestartIfTranslocated()) {
-		// we restarted the retranslocated app noch with correct attributes => exit this useless instance
-		return 0;
-	}
 #endif
 	return sysmain(argc, argv);
 }

@@ -147,7 +147,7 @@ help_frame_t::help_frame_t(char const* const filename) :
 	add_helpfile( how_to_play, "Enter Password", "password.txt", false, 1 );
 
 	add_helpfile( others, "Einstellungen aendern", "options.txt", false, 0 );
-	add_helpfile( others, "Helligk. u. Farben", "display.txt", false, 0 );
+	add_helpfile( others, "Display settings", "display.txt", false, 0 );
 	add_helpfile( others, "Mailbox", "mailbox.txt", false, 0 );
 	add_helpfile( others, "Sound settings", "sound.txt", false, 0 );
 	add_helpfile( others, "Sprachen", "language.txt", false, 0 );
@@ -182,7 +182,7 @@ static char *load_text(char const* const filename )
 {
 	std::string file_prefix= std::string("text") + PATH_SEPARATOR;
 	std::string fullname = file_prefix + translator::get_lang()->iso + PATH_SEPARATOR + filename;
-	dr_chdir(env_t::data_dir);
+	dr_chdir(env_t::base_dir);
 
 	FILE* file = dr_fopen(fullname.c_str(), "rb");
 	if (!file) {
@@ -397,7 +397,7 @@ FILE *help_frame_t::has_helpfile( char const* const filename, int &mode )
 	mode = native;
 	std::string file_prefix = std::string("text") + PATH_SEPARATOR;
 	std::string fullname = file_prefix + translator::get_lang()->iso + PATH_SEPARATOR + filename;
-	dr_chdir(env_t::data_dir);
+	dr_chdir(env_t::base_dir);
 
 	FILE* file = dr_fopen(fullname.c_str(), "rb");
 	if(  !file  &&  strcmp(translator::get_lang()->iso,translator::get_lang()->iso_base)  ) {

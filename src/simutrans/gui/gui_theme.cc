@@ -16,7 +16,8 @@
 #include "components/gui_button.h"
 #include "components/gui_tab_panel.h"
 #include "../descriptor/skin_desc.h"
-#include "../descriptor/reader/obj_reader.h"
+#include "../dataobj/pakset_manager.h"
+
 
 /**
  * Colours
@@ -61,6 +62,7 @@ PIXVAL gui_theme_t::gui_color_loadingbar_progress;
 PIXVAL gui_theme_t::gui_color_obsolete;
 PIXVAL gui_theme_t::gui_color_chat_window_network_transparency;
 PIXVAL gui_theme_t::gui_color_empty;
+PIXVAL gui_theme_t::gui_color_image_transparency;
 
 /**
  * Max Kielland
@@ -181,6 +183,8 @@ void gui_theme_t::init_gui_defaults()
 
 	gui_color_obsolete                     = color_idx_to_rgb(COL_BLUE);
 	gui_color_empty                        = color_idx_to_rgb(COL_WHITE);
+
+	gui_color_image_transparency          = color_idx_to_rgb(COL_BLACK);
 
 	env_t::gui_player_color_bright = 4;
 	env_t::gui_player_color_dark   = 1;
@@ -419,7 +423,7 @@ bool gui_theme_t::themes_init(const char *file_name, bool init_fonts, bool init_
 			*s = 0;
 		}
 		dr_chdir( pathname );
-		obj_reader_t::read_file(buttonpak.c_str());
+		pakset_manager_t::load_pak_file(buttonpak);
 		gui_theme_t::init_gui_from_images();
 		free(pathname);
 		dr_chdir(env_t::user_dir);
@@ -535,6 +539,7 @@ bool gui_theme_t::themes_init(const char *file_name, bool init_fonts, bool init_
 	gui_theme_t::gui_color_obsolete                     = (PIXVAL)contents.get_color("gui_color_obsolete", SYSCOL_OBSOLETE);
 	gui_theme_t::gui_color_empty                        = (PIXVAL)contents.get_color("gui_color_empty", SYSCOL_EMPTY);
 	gui_theme_t::gui_color_chat_window_network_transparency = (PIXVAL)contents.get_color("gui_color_chat_window_network_transparency", gui_color_chat_window_network_transparency);
+	gui_theme_t::gui_color_image_transparency           = (PIXVAL)contents.get_color("gui_color_image_transparency", SYSCOL_IMAGE_TRANSPARENCY);
 
 	gui_theme_t::gui_waitingbar_width = (uint32)contents.get_int("gui_waitingbar_width", gui_theme_t::gui_waitingbar_width);
 
