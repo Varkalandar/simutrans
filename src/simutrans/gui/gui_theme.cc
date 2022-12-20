@@ -41,6 +41,8 @@ PIXVAL gui_theme_t::gui_color_chart_lines_odd;
 PIXVAL gui_theme_t::gui_color_chart_lines_even;
 PIXVAL gui_theme_t::gui_color_list_text_selected_focus;
 PIXVAL gui_theme_t::gui_color_list_text_selected_nofocus;
+PIXVAL gui_theme_t::gui_color_list_background_even;
+PIXVAL gui_theme_t::gui_color_list_background_odd;
 PIXVAL gui_theme_t::gui_color_list_background_selected_f;
 PIXVAL gui_theme_t::gui_color_list_background_selected_nf;
 PIXVAL gui_theme_t::gui_color_button_text;
@@ -158,6 +160,8 @@ void gui_theme_t::init_gui_defaults()
 
 	gui_color_list_text_selected_focus     = color_idx_to_rgb(COL_WHITE);
 	gui_color_list_text_selected_nofocus   = color_idx_to_rgb(MN_GREY3);
+	gui_color_list_background_even         = color_idx_to_rgb(MN_GREY2);
+	gui_color_list_background_odd          = color_idx_to_rgb(MN_GREY3);
 	gui_color_list_background_selected_f   = color_idx_to_rgb(COL_BLUE);
 	gui_color_list_background_selected_nf  = color_idx_to_rgb(COL_LIGHT_BLUE);
 
@@ -520,6 +524,8 @@ bool gui_theme_t::themes_init(const char *file_name, bool init_fonts, bool init_
 	gui_theme_t::gui_color_list_text_selected_nofocus   = (PIXVAL)contents.get_color("gui_color_list_text_selected_nofocus", SYSCOL_LIST_TEXT_SELECTED_NOFOCUS);
 	gui_theme_t::gui_color_list_background_selected_f   = (PIXVAL)contents.get_color("gui_color_list_background_selected_focus", SYSCOL_LIST_BACKGROUND_SELECTED_F);
 	gui_theme_t::gui_color_list_background_selected_nf  = (PIXVAL)contents.get_color("gui_color_list_background_selected_nofocus", SYSCOL_LIST_BACKGROUND_SELECTED_NF);
+	gui_theme_t::gui_color_list_background_even         = (PIXVAL)contents.get_color("gui_color_list_background_even", gui_color_list_background_even);
+	gui_theme_t::gui_color_list_background_odd          = (PIXVAL)contents.get_color("gui_color_list_background_odd", gui_color_list_background_odd);
 	gui_theme_t::gui_color_button_text                  = (PIXVAL)contents.get_color("gui_color_button_text", SYSCOL_BUTTON_TEXT);
 	gui_theme_t::gui_color_button_text_disabled         = (PIXVAL)contents.get_color("gui_color_button_text_disabled", SYSCOL_BUTTON_TEXT_DISABLED);
 	gui_theme_t::gui_color_button_text_selected         = (PIXVAL)contents.get_color("gui_color_button_text_selected", SYSCOL_BUTTON_TEXT_SELECTED);
