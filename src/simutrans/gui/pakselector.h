@@ -37,6 +37,13 @@ public:
 	const char *get_help_filename ( void ) const OVERRIDE { return ""; }
 	bool        has_title         ( void ) const OVERRIDE { return false; }
 	bool        has_pak           ( void ) const          { return !entries.empty(); }
+	
+        /**
+	 * Draw new component. The values to be passed refer to the window
+	 * i.e. It's the screen coordinates of the window where the
+	 * component is displayed.
+	 */
+	virtual void draw(scr_coord pos, scr_size size);	
 };
 
 #endif

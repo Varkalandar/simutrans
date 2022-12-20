@@ -9,6 +9,7 @@
 #include "../dataobj/environment.h"
 #include "../sys/simsys.h"
 #include "../pathes.h"
+#include "../descriptor/skin_desc.h"
 
 
 pakselector_t::pakselector_t() :
@@ -160,4 +161,25 @@ bool pakselector_install_action_t::action_triggered( gui_action_creator_t*, valu
 {
 	pakinstaller_t::finish_install = true;
 	return true;
+}
+
+
+/**
+	 * Draw new component. The values to be passed refer to the window
+	 * i.e. It's the screen coordinates of the window where the
+	 * component is displayed.
+	 */
+void pakselector_t::draw(scr_coord pos, scr_size size)
+{	
+	const skin_desc_t *tp = skinverwaltung_t::get_extra("Titlescreen", 11, skinverwaltung_t::menu);
+	
+	for(int y=0; y<9; y++)
+	{
+		for(int x=0; x<12; x++)
+		{
+			display_base_img(tp->get_image_id(y*12 + x), x*64, y*64, 0, false, true);
+		}
+	}
+
+	savegame_frame_t::draw(pos, size);
 }
