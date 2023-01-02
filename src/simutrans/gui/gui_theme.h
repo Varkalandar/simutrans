@@ -286,6 +286,7 @@ public:
 	static scr_coord_val gui_hspace;
 	static scr_coord_val gui_vspace;
 	static scr_coord_val gui_waitingbar_width;
+	static scr_coord_val gui_display_text_label_height;
 
 	// one special entries, since there are lot of lists with files/fonts/paks/... where zero spacing could fit more entires on the screen
 	static scr_coord_val gui_filelist_vspace;
