@@ -118,13 +118,19 @@ gui_color_loadingbar_inner = #303246
 # Color player bright
 gui_player_color_dark = 3
 gui_player_color_bright = 1
+
+# station labels
 gui_player_color_label = 5
+gui_display_text_label_height = 22
 
 # make the chat window transparent in network games
 gui_chat_window_network_transparency = 25
 
 # if defined, use plain color for chat window in network games
 gui_color_chat_window_network_transparency = #D6ECF7
+
+# Transparency color of boost icons (mail, energy, passangers) in factories
+gui_color_image_transparency = #ffffff
 
 ##################################size stuff##################################
 
