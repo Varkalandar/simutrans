@@ -1657,20 +1657,23 @@ void grund_t::display_obj_fg(const sint16 xpos, const sint16 ypos, const bool is
 // display text label in player colors using different styles set by env_t::show_names
 void display_text_label(sint16 xpos, sint16 ypos, const char* text, const player_t *player, bool dirty)
 {
-        if(gui_theme_t::display_text_label)
+        if(skinverwaltung_t::display_text_label)
         {
                 // Hajo: Theme has a label background, display it and then then text
 
                 int text_width = proportional_string_width(text);
-                const scr_rect area(xpos, ypos, text_width + 10, 22);
+                const scr_rect area(xpos, ypos, text_width + 10, gui_theme_t::gui_display_text_label_height);
 
                 display_img_stretch(gui_theme_t::display_text_label, area);
 
                 // player color
-                uint8 offset = env_t::gui_player_color_label;
-                sint16 pc = player ? player->get_player_color1()+offset : SYSCOL_TEXT_HIGHLIGHT;
-                display_proportional_rgb(area.x+5, area.y+7, text, ALIGN_LEFT, color_idx_to_rgb(pc), dirty); 
-                // display_outline_proportional_rgb(area.x+5, area.y+7, color_idx_to_rgb(pc+3), color_idx_to_rgb(pc-3), text, dirty );
+                uint8 brightness = env_t::gui_player_color_label;
+                sint16 pc = player ? player->get_player_color1() + brightness : SYSCOL_TEXT_HIGHLIGHT;
+
+                // vertical offset. Total height less text height ?
+                sint16 top = (area.h - LINESPACE + 3) >> 1;
+                
+                display_proportional_rgb(area.x+5, area.y+top, text, ALIGN_LEFT, color_idx_to_rgb(pc), dirty); 
         }
         else
         {
