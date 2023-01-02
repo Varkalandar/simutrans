@@ -268,6 +268,7 @@ public:
 
 	static uint8 gui_player_color_dark;
 	static uint8 gui_player_color_bright;
+	static uint8 gui_player_color_label;
 
 	// default font name and -size
 	static std::string fontname;

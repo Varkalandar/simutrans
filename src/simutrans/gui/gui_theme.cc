@@ -120,6 +120,7 @@ stretch_map_t gui_theme_t::divider;
 stretch_map_t gui_theme_t::editfield;
 stretch_map_t gui_theme_t::listbox;
 stretch_map_t gui_theme_t::windowback;
+stretch_map_t gui_theme_t::display_text_label;
 
 // and the simple buttons
 image_id gui_theme_t::arrow_button_left_img[3];
@@ -184,10 +185,11 @@ void gui_theme_t::init_gui_defaults()
 	gui_color_obsolete                     = color_idx_to_rgb(COL_BLUE);
 	gui_color_empty                        = color_idx_to_rgb(COL_WHITE);
 
-	gui_color_image_transparency          = color_idx_to_rgb(COL_BLACK);
+	gui_color_image_transparency           = color_idx_to_rgb(COL_BLACK);
 
 	env_t::gui_player_color_bright = 4;
 	env_t::gui_player_color_dark   = 1;
+	env_t::gui_player_color_label  = 3;
 
 	gui_button_size              = scr_size(92,14);
 	gui_color_button_size        = scr_size(92,16);
@@ -293,6 +295,7 @@ void gui_theme_t::init_gui_from_images()
 		editfield[j%3][j/3] = skinverwaltung_t::editfield->get_image_id( j );
 		listbox[j%3][j/3] = skinverwaltung_t::listbox->get_image_id( j );
 		windowback[j%3][j/3] = skinverwaltung_t::back->get_image_id( j );
+		display_text_label[j%3][j/3] = skinverwaltung_t::display_text_label->get_image_id( j );
 	}
 
 	// Divider (vspace will be added later on)
@@ -560,6 +563,7 @@ bool gui_theme_t::themes_init(const char *file_name, bool init_fonts, bool init_
 	env_t::menupos                   = contents.get_int("menubar_position",          env_t::menupos);
 	env_t::gui_player_color_bright =   contents.get_int("gui_player_color_bright",   env_t::gui_player_color_bright );
 	env_t::gui_player_color_dark =     contents.get_int("gui_player_color_dark",     env_t::gui_player_color_dark );
+	env_t::gui_player_color_label =    contents.get_int("gui_player_color_label",    env_t::gui_player_color_label );
 
 	env_t::default_window_title_color = contents.get_color("default_window_title_color", env_t::default_window_title_color,  &env_t::default_window_title_color_rgb );
 	env_t::front_window_text_color =    contents.get_color("front_window_text_color",    env_t::front_window_text_color,  &env_t::front_window_text_color_rgb );

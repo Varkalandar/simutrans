@@ -303,6 +303,7 @@ public:
 	static stretch_map_t editfield;
 	static stretch_map_t listbox;
 	static stretch_map_t windowback;
+	static stretch_map_t display_text_label;
 
 	// those are the normal, selected and disabled simple buttons
 	static image_id arrow_button_left_img[3];
