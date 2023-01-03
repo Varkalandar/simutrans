@@ -90,6 +90,8 @@ scr_size gui_theme_t::gui_gadget_size;
 scr_size gui_theme_t::gui_dragger_size;
 scr_size gui_theme_t::gui_indicator_size;
 scr_coord_val gui_theme_t::gui_waitingbar_width;
+scr_coord_val gui_theme_t::gui_display_text_label_height;
+scr_coord_val gui_theme_t::gui_display_text_label_margin;
 
 scr_coord gui_theme_t::gui_focus_offset;
 scr_coord gui_theme_t::gui_button_text_offset_right;
@@ -122,6 +124,7 @@ stretch_map_t gui_theme_t::divider;
 stretch_map_t gui_theme_t::editfield;
 stretch_map_t gui_theme_t::listbox;
 stretch_map_t gui_theme_t::windowback;
+stretch_map_t gui_theme_t::display_text_label;
 
 // and the simple buttons
 image_id gui_theme_t::arrow_button_left_img[3];
@@ -188,7 +191,7 @@ void gui_theme_t::init_gui_defaults()
 	gui_color_obsolete                     = color_idx_to_rgb(COL_BLUE);
 	gui_color_empty                        = color_idx_to_rgb(COL_WHITE);
 
-	gui_color_image_transparency          = color_idx_to_rgb(COL_BLACK);
+	gui_color_image_transparency           = color_idx_to_rgb(COL_BLACK);
 
 	env_t::gui_player_color_bright = 4;
 	env_t::gui_player_color_dark   = 1;
@@ -222,7 +225,9 @@ void gui_theme_t::init_gui_defaults()
 	gui_filelist_vspace  = 0;
 	gui_waitingbar_width = 4;
 	gui_divider_size.h   = D_V_SPACE*2;
-
+        gui_display_text_label_height = 22;
+        gui_display_text_label_margin = 6;
+        
 	gui_drop_shadows     = false;
 
 	gui_color_chat_window_network_transparency = color_idx_to_rgb(COL_WHITE);
@@ -297,6 +302,11 @@ void gui_theme_t::init_gui_from_images()
 		editfield[j%3][j/3] = skinverwaltung_t::editfield->get_image_id( j );
 		listbox[j%3][j/3] = skinverwaltung_t::listbox->get_image_id( j );
 		windowback[j%3][j/3] = skinverwaltung_t::back->get_image_id( j );
+                
+                // Hajo: this is optional for themes
+                if(skinverwaltung_t::display_text_label) {
+                        display_text_label[j%3][j/3] = skinverwaltung_t::display_text_label->get_image_id( j );
+                }
 	}
 
 	// Divider (vspace will be added later on)
@@ -486,6 +496,9 @@ bool gui_theme_t::themes_init(const char *file_name, bool init_fonts, bool init_
 	gui_theme_t::gui_pos_button_size.w = (uint32)contents.get_int("gui_posbutton_width",  gui_theme_t::gui_pos_button_size.w );
 	gui_theme_t::gui_pos_button_size.h = (uint32)contents.get_int("gui_posbutton_height", gui_theme_t::gui_pos_button_size.h );
 
+        gui_theme_t::gui_display_text_label_height = contents.get_int("gui_display_text_label_height", gui_theme_t::gui_display_text_label_height);
+        gui_theme_t::gui_display_text_label_margin = contents.get_int("gui_display_text_label_margin", gui_theme_t::gui_display_text_label_margin);
+        
 	// read ../dataobj/tabfile.h for clarification of this area
 	vector_tpl<int> color_button_text_offsets = contents.get_ints("gui_color_button_text_offset");
 	if(  color_button_text_offsets.get_count() > 2  ) {

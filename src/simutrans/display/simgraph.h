@@ -193,7 +193,8 @@ void display_base_img(const image_id n, scr_coord_val xp, scr_coord_val yp, cons
 typedef image_id stretch_map_t[3][3];
 
 // this displays a 3x3 array of images to fit the scr_rect
-void display_img_stretch( const stretch_map_t &imag, scr_rect area );
+// Hajo: color is a player color index here.
+void display_img_stretch( const stretch_map_t &imag, scr_rect area, FLAGGED_PIXVAL color );
 
 // this displays a 3x3 array of images to fit the scr_rect like above, but blend the color
 void display_img_stretch_blend( const stretch_map_t &imag, scr_rect area, FLAGGED_PIXVAL color );

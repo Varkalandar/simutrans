@@ -115,7 +115,7 @@ cursor_overlay_color = #1060F0
 gui_color_loadingbar_progress = #6080A0
 gui_color_loadingbar_inner = #303246
 
-# Color player brigth
+# Color player bright
 gui_player_color_dark = 3
 gui_player_color_bright = 1
 
@@ -124,6 +124,9 @@ gui_chat_window_network_transparency = 25
 
 # if defined, use plain color for chat window in network games
 gui_color_chat_window_network_transparency = #D6ECF7
+
+# Transparency color of boost icons (mail, energy, passangers) in factories
+gui_color_image_transparency = #ffffff
 
 ##################################size stuff##################################
 
