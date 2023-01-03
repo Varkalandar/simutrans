@@ -120,8 +120,8 @@ gui_player_color_dark = 1
 gui_player_color_bright = 3
 
 # station labels
-gui_player_color_label = 1
 gui_display_text_label_height = 18
+gui_display_text_label_margin = 6
 
 # make the chat window transparent in network games
 gui_chat_window_network_transparency = 25
