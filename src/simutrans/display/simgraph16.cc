@@ -459,6 +459,7 @@ uint8 display_night_lights[LIGHT_COUNT*3] = {
 
 // the players colors and colors for simple drawing operations
 // each three values correspond to a color, each 8 colors are a player color
+/*
 static const uint8 special_pal[SPECIAL_COLOR_COUNT*3] =
 {
 0, 0, 0,
@@ -686,8 +687,8 @@ static const uint8 special_pal[SPECIAL_COLOR_COUNT*3] =
 165, 145, 218,
 198, 191, 232,
 };
+*/
 
-/*
 static const uint8 special_pal[SPECIAL_COLOR_COUNT*3] =
 {
 	36, 75, 103,
@@ -915,7 +916,7 @@ static const uint8 special_pal[SPECIAL_COLOR_COUNT*3] =
 	165, 145, 218,
 	198, 191, 232,
 };
-*/
+
 
 /*
  * tile raster width
