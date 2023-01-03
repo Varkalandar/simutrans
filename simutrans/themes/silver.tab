@@ -4,7 +4,7 @@
 # https://wiki.simutrans.com/en_themeDef
 #
 # name of the theme (will be shown with file selector)
-name=Modern
+name=Silver
 
 # show tooltips (default 1=show)
 show_tooltips = 1
@@ -56,10 +56,10 @@ bottom_window_text_color = #C0C0C0
 
 #################################colour stuff#################################
 
-default_window_title_color = #338FCC
+default_window_title_color = #84939e
 
 # gui_color_text = #000000
-gui_color_text_highlight = #005C9E
+gui_color_text_highlight = #706000
 gui_color_text_shadow = #BDD3DF
 gui_color_text_title = #338FCC
 gui_color_text_strong = #E46A0B
@@ -74,17 +74,17 @@ gui_color_edit_text_disabled = #666666
 gui_color_edit_background_selected = #72B2DD
 gui_color_edit_beam = #000000
 
-gui_color_chart_background = #FAFAFA
+gui_color_chart_background = #6f6d60
 gui_color_chart_lines_zero = #005C9E
-gui_color_chart_lines_odd = #338FCC
-gui_color_chart_lines_even = #338FCC
+gui_color_chart_lines_odd = #373630
+gui_color_chart_lines_even = #373630
 
 gui_color_list_text_selected_focus = #FAFAFA
 gui_color_list_text_selected_nofocus = #FAFAFA
 gui_color_list_background_selected_focus = #72B2DD
 gui_color_list_background_selected_nofocus = #72B2DD
 
-gui_color_button_text = #FAFAFA
+gui_color_button_text = #001020
 gui_color_button_text_disabled = #666666
 gui_color_button_text_selected = #FAFAFA
 
@@ -98,20 +98,20 @@ gui_color_ticker_background = #D6ECF7
 gui_color_ticker_divider = #6095B8
 
 # gui_color_statusbar_text = #000000
-gui_color_statusbar_background = #72B2DD
-gui_color_statusbar_divider = #6095B8
+gui_color_statusbar_background = #b8b8a8
+gui_color_statusbar_divider = #f8fcf0
 
-gui_highlight_color = #8FC5E6
-gui_shadow_color = #8FC5E6
+gui_highlight_color = #FFFFF7
+gui_shadow_color = #72726E
 
 # gui_color_text_minus = #C00000
 # gui_color_text_plus = #000000
-gui_color_text_unused = #E46A0B
+gui_color_text_unused = #555f66
 
 # Color of cursor overlay, which is blended over marked ground tiles
 cursor_overlay_color = #ff0000
 
-# Colo loadbar, save game, load game, server...
+# Color loadbar, save game, load game, server...
 gui_color_loadingbar_progress = #76b9e6
 gui_color_loadingbar_inner = #D6ECF7
 
@@ -132,6 +132,9 @@ icon_width = 32
 
 # titlebar height
 gui_titlebar_height = 22
+
+# width of the window elements
+gui_gadget_width = 20
 
 # safe margin around windows
 # gui_frame_left = 10
@@ -164,8 +167,8 @@ gui_button_height = 16
 gui_button_width = 100
 
 # text margins inside the buttons (left, top, right)
-gui_button_text_offset = 5,0,5
-gui_color_button_text_offset = 5,0,5
+gui_button_text_offset = 5,1,5
+gui_color_button_text_offset = 5,1,5
 
 # maximum size of tool bars in tools (0 = no limit)
 # if more tools than allowed by height,
@@ -176,4 +179,4 @@ toolbar_max_height = 0
 ###################################pakstuff###################################
 
 # pak with the images for this theme
-themeimages=modern.pak
+themeimages=silver.pak
