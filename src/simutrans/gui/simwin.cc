@@ -1771,7 +1771,7 @@ void win_display_flush(double konto)
 		display_fit_img_to_width( back_img, env_t::iconsize.w );
 
 		stretch_map_t imag = { {IMG_EMPTY, IMG_EMPTY, IMG_EMPTY}, {IMG_EMPTY, back_img, IMG_EMPTY}, {IMG_EMPTY, IMG_EMPTY, IMG_EMPTY} };
-		display_img_stretch(imag, scr_rect(menu_pos, menu_size));
+		display_img_stretch(imag, scr_rect(menu_pos, menu_size), 0);
 	}
 	else {
 		display_fillbox_wh_rgb( menu_pos.x, menu_pos.y, menu_size.w, menu_size.h, color_idx_to_rgb(MN_GREY2), false );

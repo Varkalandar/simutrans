@@ -89,6 +89,7 @@ scr_size gui_theme_t::gui_dragger_size;
 scr_size gui_theme_t::gui_indicator_size;
 scr_coord_val gui_theme_t::gui_waitingbar_width;
 scr_coord_val gui_theme_t::gui_display_text_label_height;
+scr_coord_val gui_theme_t::gui_display_text_label_margin;
 
 scr_coord gui_theme_t::gui_focus_offset;
 scr_coord gui_theme_t::gui_button_text_offset_right;
@@ -190,7 +191,6 @@ void gui_theme_t::init_gui_defaults()
 
 	env_t::gui_player_color_bright = 4;
 	env_t::gui_player_color_dark   = 1;
-	env_t::gui_player_color_label  = 3;
 
 	gui_button_size              = scr_size(92,14);
 	gui_color_button_size        = scr_size(92,16);
@@ -222,6 +222,7 @@ void gui_theme_t::init_gui_defaults()
 	gui_waitingbar_width = 4;
 	gui_divider_size.h   = D_V_SPACE*2;
         gui_display_text_label_height = 22;
+        gui_display_text_label_margin = 6;
         
 	gui_drop_shadows     = false;
 
@@ -492,6 +493,7 @@ bool gui_theme_t::themes_init(const char *file_name, bool init_fonts, bool init_
 	gui_theme_t::gui_pos_button_size.h = (uint32)contents.get_int("gui_posbutton_height", gui_theme_t::gui_pos_button_size.h );
 
         gui_theme_t::gui_display_text_label_height = contents.get_int("gui_display_text_label_height", gui_theme_t::gui_display_text_label_height);
+        gui_theme_t::gui_display_text_label_margin = contents.get_int("gui_display_text_label_margin", gui_theme_t::gui_display_text_label_margin);
         
 	// read ../dataobj/tabfile.h for clarification of this area
 	vector_tpl<int> color_button_text_offsets = contents.get_ints("gui_color_button_text_offset");
@@ -571,7 +573,6 @@ bool gui_theme_t::themes_init(const char *file_name, bool init_fonts, bool init_
 	env_t::menupos                   = contents.get_int("menubar_position",          env_t::menupos);
 	env_t::gui_player_color_bright =   contents.get_int("gui_player_color_bright",   env_t::gui_player_color_bright );
 	env_t::gui_player_color_dark =     contents.get_int("gui_player_color_dark",     env_t::gui_player_color_dark );
-	env_t::gui_player_color_label =    contents.get_int("gui_player_color_label",    env_t::gui_player_color_label );
 
 	env_t::default_window_title_color = contents.get_color("default_window_title_color", env_t::default_window_title_color,  &env_t::default_window_title_color_rgb );
 	env_t::front_window_text_color =    contents.get_color("front_window_text_color",    env_t::front_window_text_color,  &env_t::front_window_text_color_rgb );

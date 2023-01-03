@@ -1660,20 +1660,18 @@ void display_text_label(sint16 xpos, sint16 ypos, const char* text, const player
         if(skinverwaltung_t::display_text_label)
         {
                 // Hajo: Theme has a label background, display it and then then text
-
+                int margin = gui_theme_t::gui_display_text_label_margin;
                 int text_width = proportional_string_width(text);
-                const scr_rect area(xpos, ypos, text_width + 10, gui_theme_t::gui_display_text_label_height);
+                const scr_rect area(xpos, ypos, text_width + margin * 2, gui_theme_t::gui_display_text_label_height);
 
-                display_img_stretch(gui_theme_t::display_text_label, area);
-
-                // player color
-                uint8 brightness = env_t::gui_player_color_label;
-                sint16 pc = player ? player->get_player_color1() + brightness : SYSCOL_TEXT_HIGHLIGHT;
+                sint16 pnr = player ? player->get_player_nr() : 0;
+                
+                display_img_stretch(gui_theme_t::display_text_label, area, pnr);
 
                 // vertical offset. Total height less text height ?
                 sint16 top = (area.h - LINESPACE + 3) >> 1;
                 
-                display_proportional_rgb(area.x+5, area.y+top, text, ALIGN_LEFT, color_idx_to_rgb(pc), dirty); 
+                display_proportional_rgb(area.x+margin, area.y+top, text, ALIGN_LEFT, color_idx_to_rgb(COL_BLACK), dirty); 
         }
         else
         {

@@ -177,7 +177,6 @@ sint8 env_t::show_money_message;
 
 uint8 env_t::gui_player_color_dark = 1;
 uint8 env_t::gui_player_color_bright = 4;
-uint8 env_t::gui_player_color_label = 3;
 
 #ifndef __ANDROID__
 std::string env_t::fontname = FONT_PATH_X "prop.fnt";
