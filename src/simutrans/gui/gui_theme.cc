@@ -503,9 +503,14 @@ bool gui_theme_t::themes_init(const char *file_name, bool init_fonts, bool init_
         // display text label properties
         gui_theme_t::gui_display_text_label_height = contents.get_int("gui_display_text_label_height", gui_theme_t::gui_display_text_label_height);
         
-        const char* label_color_string = contents.get("gui_display_text_label_color");
+        const char* label_color_string = contents.get_string("gui_display_text_label_color", NULL);
+
         if(label_color_string) {
-                if(label_color_string[0] == '#') {
+                // skip spaces/tabs
+		while(*label_color_string > 0 && *label_color_string <= 32) {
+			label_color_string ++;
+		}
+                if(*label_color_string == '#') {
                         // we have a rgb value
                         gui_theme_t::gui_display_text_label_color = contents.get_color("gui_display_text_label_color", COL_BLACK);
                 } else {

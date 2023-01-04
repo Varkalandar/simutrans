@@ -1692,7 +1692,7 @@ void display_text_label(sint16 xpos, sint16 ypos, const char* text, const player
 
                         if(color >= 0) {
                                 // a fixed PIXVAL
-                                display_proportional_rgb(area.x+margin_left, area.y+margin_top, text, ALIGN_LEFT, color_idx_to_rgb(COL_BLACK), dirty); 
+                                display_proportional_rgb(area.x+margin_left, area.y+margin_top, text, ALIGN_LEFT, color, dirty);
                         } else {
                                 // display_proportional_rgb(area.x+margin, area.y+top, text, ALIGN_LEFT, color_idx_to_rgb(COL_BLACK), dirty); 
 
