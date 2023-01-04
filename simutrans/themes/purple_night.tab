@@ -85,7 +85,7 @@ gui_color_list_background_selected_focus = #72B2DD
 gui_color_list_background_selected_nofocus = #72B2DD
 
 gui_color_button_text = #B7B7B7
-gui_color_button_text_disabled = #666666
+gui_color_button_text_disabled = #8A8A8A
 gui_color_button_text_selected = #FAFAFA
 
 gui_color_colored_button_text = #201000
