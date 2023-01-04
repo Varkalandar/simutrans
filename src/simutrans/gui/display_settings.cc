@@ -657,18 +657,29 @@ bool color_gui_t::action_triggered( gui_action_creator_t *comp, value_t)
 		grund_t::toggle_grid();
 		break;
 	case IDBTN_SHOW_STATION_NAMES_ARROW:
-		if( env_t::show_names & 1 ) {
-			if( (env_t::show_names >> 2) == 2 ) {
-				env_t::show_names &= 2;
-			}
-			else {
-				env_t::show_names += 4;
-			}
-		}
-		else {
-			env_t::show_names &= 2;
-			env_t::show_names |= 1;
-		}
+                
+                // Hajo: first check the "show" bit ... do we show names at all?                
+                if(env_t::show_names & 1) {
+                        // Yes ... so cycle the styles
+                        
+                        int style = env_t::show_names >> 2;
+                        style ++;
+                        
+                        // if we reach the end of the cycle, we must also 
+                        // turn off showing the names
+                        int limit = 3 + (skinverwaltung_t::display_text_label != 0);
+                        if(style >= limit) {
+                                style = 0;
+                                env_t::show_names &= 2;
+                        }
+                        
+                        env_t::show_names &= 0xFFF3;
+                        env_t::show_names |= (style << 2);    
+                } else {
+                        // name display was off. Now turn it on with style 0
+                        env_t::show_names |= 1;
+                }
+                                        
 		break;
 	case IDBTN_SHOW_WAITING_BARS:
 		env_t::show_names ^= 2;

@@ -287,7 +287,10 @@ public:
 	static scr_coord_val gui_vspace;
 	static scr_coord_val gui_waitingbar_width;
 	static scr_coord_val gui_display_text_label_height;
-	static scr_coord_val gui_display_text_label_margin;
+	static sint32 gui_display_text_label_color; // >= 0 is RGB555, < 0 is a player color brightness
+	static scr_coord_val gui_display_text_label_margin_left;
+	static scr_coord_val gui_display_text_label_margin_top;
+	static scr_coord_val gui_display_text_label_margin_right;
 
 	// one special entries, since there are lot of lists with files/fonts/paks/... where zero spacing could fit more entires on the screen
 	static scr_coord_val gui_filelist_vspace;
