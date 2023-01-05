@@ -1665,10 +1665,12 @@ void display_themed_text_label(sint16 xpos, sint16 ypos, const char* text, const
                 sint16 margin_left = gui_theme_t::gui_display_text_label_margin_left;
                 sint16 margin_right = gui_theme_t::gui_display_text_label_margin_right;
                 sint16 margin_top = gui_theme_t::gui_display_text_label_margin_top;
-
+                sint16 margin_bottom = gui_theme_t::gui_display_text_label_margin_bottom;
+                sint16 label_height = LINESPACE + margin_top + margin_bottom; 
+                
                 const scr_rect area(xpos, ypos, 
                                     text_width + margin_left + margin_right, 
-                                    gui_theme_t::gui_display_text_label_height);
+                                    label_height);
 
                 sint16 pnr = player ? player->get_player_nr() : 0;
 
@@ -1680,14 +1682,13 @@ void display_themed_text_label(sint16 xpos, sint16 ypos, const char* text, const
                         // a fixed PIXVAL
                         display_proportional_rgb(area.x+margin_left, area.y+margin_top, text, ALIGN_LEFT, color, dirty);
                 } else {
-                        // display_proportional_rgb(area.x+margin, area.y+top, text, ALIGN_LEFT, color_idx_to_rgb(COL_BLACK), dirty); 
-
+                        // a player color brightness value
                         sint16 pc = player ? player->get_player_color1()+(-color) : SYSCOL_TEXT_HIGHLIGHT;
                         display_proportional_clip_rgb(area.x+margin_left, area.y+margin_top, text, ALIGN_LEFT, color_idx_to_rgb(pc), dirty);
                 }
-
         }
 }
+
 
 /**
  * Display text label in player colors using different styles set by env_t::show_names

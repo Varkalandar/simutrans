@@ -88,11 +88,12 @@ scr_size gui_theme_t::gui_gadget_size;
 scr_size gui_theme_t::gui_dragger_size;
 scr_size gui_theme_t::gui_indicator_size;
 scr_coord_val gui_theme_t::gui_waitingbar_width;
-scr_coord_val gui_theme_t::gui_display_text_label_height;
+
 scr_coord_val gui_theme_t::gui_display_text_label_color;
 scr_coord_val gui_theme_t::gui_display_text_label_margin_left;
 scr_coord_val gui_theme_t::gui_display_text_label_margin_top;
 scr_coord_val gui_theme_t::gui_display_text_label_margin_right;
+scr_coord_val gui_theme_t::gui_display_text_label_margin_bottom;
 
 scr_coord gui_theme_t::gui_focus_offset;
 scr_coord gui_theme_t::gui_button_text_offset_right;
@@ -224,11 +225,12 @@ void gui_theme_t::init_gui_defaults()
 	gui_filelist_vspace  = 0;
 	gui_waitingbar_width = 4;
 	gui_divider_size.h   = D_V_SPACE*2;
-        gui_display_text_label_height = 22;
+
         gui_display_text_label_color = 0;
         gui_display_text_label_margin_left = 6;
         gui_display_text_label_margin_top = 4;
         gui_display_text_label_margin_right = 6;
+        gui_display_text_label_margin_bottom = 4;
         // Hajo: this must be cleared before a new theme can be loaded
         skinverwaltung_t::display_text_label = NULL;         
         
@@ -500,9 +502,7 @@ bool gui_theme_t::themes_init(const char *file_name, bool init_fonts, bool init_
 	gui_theme_t::gui_pos_button_size.w = (uint32)contents.get_int("gui_posbutton_width",  gui_theme_t::gui_pos_button_size.w );
 	gui_theme_t::gui_pos_button_size.h = (uint32)contents.get_int("gui_posbutton_height", gui_theme_t::gui_pos_button_size.h );
 
-        // display text label properties
-        gui_theme_t::gui_display_text_label_height = contents.get_int("gui_display_text_label_height", gui_theme_t::gui_display_text_label_height);
-        
+        // display text label properties        
         const char* label_color_string = contents.get_string("gui_display_text_label_color", NULL);
 
         if(label_color_string) {
@@ -525,6 +525,7 @@ bool gui_theme_t::themes_init(const char *file_name, bool init_fonts, bool init_
                 gui_theme_t::gui_display_text_label_margin_left = display_text_label_margins[0];
                 gui_theme_t::gui_display_text_label_margin_top = display_text_label_margins[1];
                 gui_theme_t::gui_display_text_label_margin_right = display_text_label_margins[2];
+                gui_theme_t::gui_display_text_label_margin_bottom = display_text_label_margins[3];
         }
         
 	// read ../dataobj/tabfile.h for clarification of this area

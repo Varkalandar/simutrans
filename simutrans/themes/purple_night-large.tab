@@ -120,9 +120,9 @@ gui_player_color_dark = 3
 gui_player_color_bright = 1
 
 # station labels
-gui_display_text_label_height = 22
-# text margins inside the labels (left, top, right)
-gui_display_text_label_margins = 8, 6, 7
+
+# text margins inside the labels (left, top, right, bottom)
+gui_display_text_label_margins = 8, 6, 7, 5
 # The color of the label text. Can be a number 1-7, to indicate player color
 # brightness or it cant be a RGB value like #000000
 gui_display_text_label_color = 7
