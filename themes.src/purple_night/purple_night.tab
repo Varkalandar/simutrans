@@ -1,8 +1,10 @@
-# Simutrans default touch theme
+#
+# Simutrans purple night theme
 #
 # Read the wiki article for better explanation and full parameters list
 # https://wiki.simutrans.com/en_themeDef
 #
+
 # name of the theme (will be shown with file selector)
 name=Purple Night
 
@@ -85,7 +87,7 @@ gui_color_list_background_selected_focus = #72B2DD
 gui_color_list_background_selected_nofocus = #72B2DD
 
 gui_color_button_text = #B7B7B7
-gui_color_button_text_disabled = #666666
+gui_color_button_text_disabled = #8A8A8A
 gui_color_button_text_selected = #FAFAFA
 
 gui_color_colored_button_text = #201000
@@ -115,7 +117,7 @@ cursor_overlay_color = #1060F0
 gui_color_loadingbar_progress = #6080A0
 gui_color_loadingbar_inner = #303246
 
-# Color player brigth
+# Color player bright
 gui_player_color_dark = 3
 gui_player_color_bright = 1
 
@@ -124,6 +126,9 @@ gui_chat_window_network_transparency = 25
 
 # if defined, use plain color for chat window in network games
 gui_color_chat_window_network_transparency = #D6ECF7
+
+# Transparency color of boost icons (mail, energy, passangers) in factories
+gui_color_image_transparency = #ffffff
 
 ##################################size stuff##################################
 
