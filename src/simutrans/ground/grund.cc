@@ -1653,54 +1653,65 @@ void grund_t::display_obj_fg(const sint16 xpos, const sint16 ypos, const bool is
 	}
 }
 
+/**
+ * Display a theme defined label with some text
+ */
+void display_themed_text_label(sint16 xpos, sint16 ypos, const char* text, const player_t *player, bool dirty)
+{
+        if(skinverwaltung_t::display_text_label) {
 
-// display text label in player colors using different styles set by env_t::show_names
+                // Hajo: Theme has a label background, display it and then then text
+                sint16 text_width = proportional_string_width(text);
+                sint16 margin_left = gui_theme_t::gui_display_text_label_margin_left;
+                sint16 margin_right = gui_theme_t::gui_display_text_label_margin_right;
+                sint16 margin_top = gui_theme_t::gui_display_text_label_margin_top;
+
+                const scr_rect area(xpos, ypos, 
+                                    text_width + margin_left + margin_right, 
+                                    gui_theme_t::gui_display_text_label_height);
+
+                sint16 pnr = player ? player->get_player_nr() : 0;
+
+                display_img_stretch(gui_theme_t::display_text_label, area, pnr);
+
+                sint32 color = gui_theme_t::gui_display_text_label_color;
+
+                if(color >= 0) {
+                        // a fixed PIXVAL
+                        display_proportional_rgb(area.x+margin_left, area.y+margin_top, text, ALIGN_LEFT, color, dirty);
+                } else {
+                        // display_proportional_rgb(area.x+margin, area.y+top, text, ALIGN_LEFT, color_idx_to_rgb(COL_BLACK), dirty); 
+
+                        sint16 pc = player ? player->get_player_color1()+(-color) : SYSCOL_TEXT_HIGHLIGHT;
+                        display_proportional_clip_rgb(area.x+margin_left, area.y+margin_top, text, ALIGN_LEFT, color_idx_to_rgb(pc), dirty);
+                }
+
+        }
+}
+
+/**
+ * Display text label in player colors using different styles set by env_t::show_names
+ */
 void display_text_label(sint16 xpos, sint16 ypos, const char* text, const player_t *player, bool dirty)
 {
-        sint16 pc = player ? player->get_player_color1()+4 : SYSCOL_TEXT_HIGHLIGHT;
-        switch( env_t::show_names >> 2 ) {
-        case 0:
-                display_ddd_proportional_clip( xpos, ypos, color_idx_to_rgb(pc), color_idx_to_rgb(COL_BLACK), text, dirty );
-                break;
-        case 1:
-                display_outline_proportional_rgb( xpos, ypos, color_idx_to_rgb(pc+3), color_idx_to_rgb(COL_BLACK), text, dirty );
-                break;
-        case 2: {
-                display_outline_proportional_rgb( xpos + LINESPACE + D_H_SPACE, ypos,   color_idx_to_rgb(COL_YELLOW), color_idx_to_rgb(COL_BLACK), text, dirty );
-                display_ddd_box_clip_rgb(         xpos,                         ypos,   LINESPACE,   LINESPACE,   color_idx_to_rgb(pc-2), PLAYER_FLAG|color_idx_to_rgb(pc+2) );
-                display_fillbox_wh_rgb(           xpos+1,                       ypos+1, LINESPACE-2, LINESPACE-2, color_idx_to_rgb(pc), dirty );
-                break;
-        }
-        case 3:
-                if(skinverwaltung_t::display_text_label) {
-
-                        // Hajo: Theme has a label background, display it and then then text
-                        sint16 text_width = proportional_string_width(text);
-                        sint16 margin_left = gui_theme_t::gui_display_text_label_margin_left;
-                        sint16 margin_right = gui_theme_t::gui_display_text_label_margin_right;
-                        sint16 margin_top = gui_theme_t::gui_display_text_label_margin_top;
-
-                        const scr_rect area(xpos, ypos, 
-                                            text_width + margin_left + margin_right, 
-                                            gui_theme_t::gui_display_text_label_height);
-
-                        sint16 pnr = player ? player->get_player_nr() : 0;
-
-                        display_img_stretch(gui_theme_t::display_text_label, area, pnr);
-
-                        sint32 color = gui_theme_t::gui_display_text_label_color;
-
-                        if(color >= 0) {
-                                // a fixed PIXVAL
-                                display_proportional_rgb(area.x+margin_left, area.y+margin_top, text, ALIGN_LEFT, color, dirty);
-                        } else {
-                                // display_proportional_rgb(area.x+margin, area.y+top, text, ALIGN_LEFT, color_idx_to_rgb(COL_BLACK), dirty); 
-
-                                sint16 pc = player ? player->get_player_color1()+(-color) : SYSCOL_TEXT_HIGHLIGHT;
-                                display_proportional_clip_rgb(area.x+margin_left, area.y+margin_top, text, ALIGN_LEFT, color_idx_to_rgb(pc), dirty);
-                        }
-
+        const sint16 pc = player ? player->get_player_color1()+4 : SYSCOL_TEXT_HIGHLIGHT;
+        const int style = env_t::show_names >> 2;
+        switch(style) {
+                case 0:
+                        display_ddd_proportional_clip( xpos, ypos, color_idx_to_rgb(pc), color_idx_to_rgb(COL_BLACK), text, dirty );
+                        break;
+                case 1:
+                        display_outline_proportional_rgb( xpos, ypos, color_idx_to_rgb(pc+3), color_idx_to_rgb(COL_BLACK), text, dirty );
+                        break;
+                case 2: {
+                        display_outline_proportional_rgb( xpos + LINESPACE + D_H_SPACE, ypos,   color_idx_to_rgb(COL_YELLOW), color_idx_to_rgb(COL_BLACK), text, dirty );
+                        display_ddd_box_clip_rgb(         xpos,                         ypos,   LINESPACE,   LINESPACE,   color_idx_to_rgb(pc-2), PLAYER_FLAG|color_idx_to_rgb(pc+2) );
+                        display_fillbox_wh_rgb(           xpos+1,                       ypos+1, LINESPACE-2, LINESPACE-2, color_idx_to_rgb(pc), dirty );
+                        break;
                 }
+                case 3:
+                        display_themed_text_label(xpos, ypos, text, player, dirty);
+                        break;
         }
 }
 
