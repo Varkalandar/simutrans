@@ -119,13 +119,21 @@ gui_color_loadingbar_inner = #303246
 gui_player_color_dark = 3
 gui_player_color_bright = 1
 
-# station labels
+# text labels
 
 # text margins inside the labels (left, top, right, bottom)
 gui_display_text_label_margins = 8, 6, 7, 5
 # The color of the label text. Can be a number 1-7, to indicate player color
 # brightness or it cant be a RGB value like #000000
-gui_display_text_label_color = 7
+gui_display_text_label_color = #FFDD55
+
+# station labels
+
+# text margins inside the labels (left, top, right, bottom)
+gui_display_station_label_margins = 14, 5, 5, 5
+# The color of the label text. Can be a number 1-7, to indicate player color
+# brightness or it cant be a RGB value like #000000.
+gui_display_station_label_color = 7
 
 # make the chat window transparent in network games
 gui_chat_window_network_transparency = 25

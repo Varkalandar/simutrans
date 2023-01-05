@@ -95,6 +95,12 @@ scr_coord_val gui_theme_t::gui_display_text_label_margin_top;
 scr_coord_val gui_theme_t::gui_display_text_label_margin_right;
 scr_coord_val gui_theme_t::gui_display_text_label_margin_bottom;
 
+scr_coord_val gui_theme_t::gui_display_station_label_color;
+scr_coord_val gui_theme_t::gui_display_station_label_margin_left;
+scr_coord_val gui_theme_t::gui_display_station_label_margin_top;
+scr_coord_val gui_theme_t::gui_display_station_label_margin_right;
+scr_coord_val gui_theme_t::gui_display_station_label_margin_bottom;
+
 scr_coord gui_theme_t::gui_focus_offset;
 scr_coord gui_theme_t::gui_button_text_offset_right;
 scr_coord gui_theme_t::gui_color_button_text_offset_right;
@@ -127,6 +133,7 @@ stretch_map_t gui_theme_t::editfield;
 stretch_map_t gui_theme_t::listbox;
 stretch_map_t gui_theme_t::windowback;
 stretch_map_t gui_theme_t::display_text_label;
+stretch_map_t gui_theme_t::display_station_label;
 
 // and the simple buttons
 image_id gui_theme_t::arrow_button_left_img[3];
@@ -231,8 +238,16 @@ void gui_theme_t::init_gui_defaults()
         gui_display_text_label_margin_top = 4;
         gui_display_text_label_margin_right = 6;
         gui_display_text_label_margin_bottom = 4;
-        // Hajo: this must be cleared before a new theme can be loaded
+
+        gui_display_station_label_color = 0;
+        gui_display_station_label_margin_left = 6;
+        gui_display_station_label_margin_top = 4;
+        gui_display_station_label_margin_right = 6;
+        gui_display_station_label_margin_bottom = 4;
+
+        // Hajo: these must be cleared before a new theme can be loaded
         skinverwaltung_t::display_text_label = NULL;         
+        skinverwaltung_t::display_station_label = NULL;         
         
 	gui_drop_shadows     = false;
 
@@ -309,9 +324,10 @@ void gui_theme_t::init_gui_from_images()
 		listbox[j%3][j/3] = skinverwaltung_t::listbox->get_image_id( j );
 		windowback[j%3][j/3] = skinverwaltung_t::back->get_image_id( j );
                 
-                // Hajo: this is optional for themes
+                // Hajo: labels are optional for themes
                 if(skinverwaltung_t::display_text_label) {
-                        display_text_label[j%3][j/3] = skinverwaltung_t::display_text_label->get_image_id( j );
+                        display_text_label[j%3][j/3] = skinverwaltung_t::display_text_label->get_image_id(j);
+                        display_station_label[j%3][j/3] = skinverwaltung_t::display_station_label->get_image_id(j);
                 }
 	}
 
@@ -519,6 +535,22 @@ bool gui_theme_t::themes_init(const char *file_name, bool init_fonts, bool init_
                 }
         }
         
+        const char* station_label_color_string = contents.get_string("gui_display_station_label_color", NULL);
+
+        if(station_label_color_string) {
+                // skip spaces/tabs
+		while(*station_label_color_string > 0 && *station_label_color_string <= 32) {
+			station_label_color_string ++;
+		}
+                if(*station_label_color_string == '#') {
+                        // we have a rgb value
+                        gui_theme_t::gui_display_station_label_color = contents.get_color("gui_display_station_label_color", COL_BLACK);
+                } else {
+                        // this must be a player color brightness
+                        gui_theme_t::gui_display_station_label_color = -contents.get_int("gui_display_station_label_color", 3);
+                }
+        }
+        
         vector_tpl<int> display_text_label_margins = contents.get_ints("gui_display_text_label_margins");
 
 	if(display_text_label_margins.get_count() > 2 ) {
@@ -526,6 +558,15 @@ bool gui_theme_t::themes_init(const char *file_name, bool init_fonts, bool init_
                 gui_theme_t::gui_display_text_label_margin_top = display_text_label_margins[1];
                 gui_theme_t::gui_display_text_label_margin_right = display_text_label_margins[2];
                 gui_theme_t::gui_display_text_label_margin_bottom = display_text_label_margins[3];
+        }
+        
+        vector_tpl<int> display_station_label_margins = contents.get_ints("gui_display_station_label_margins");
+
+	if(display_station_label_margins.get_count() > 2 ) {
+                gui_theme_t::gui_display_station_label_margin_left = display_station_label_margins[0];
+                gui_theme_t::gui_display_station_label_margin_top = display_station_label_margins[1];
+                gui_theme_t::gui_display_station_label_margin_right = display_station_label_margins[2];
+                gui_theme_t::gui_display_station_label_margin_bottom = display_station_label_margins[3];
         }
         
 	// read ../dataobj/tabfile.h for clarification of this area

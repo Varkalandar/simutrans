@@ -26,6 +26,7 @@ const skin_desc_t* skinverwaltung_t::check_button = NULL;
 const skin_desc_t* skinverwaltung_t::posbutton = NULL;
 const skin_desc_t* skinverwaltung_t::back = NULL;
 const skin_desc_t* skinverwaltung_t::display_text_label = NULL;
+const skin_desc_t* skinverwaltung_t::display_station_label = NULL;
 const skin_desc_t* skinverwaltung_t::scrollbar = NULL;
 const skin_desc_t* skinverwaltung_t::divider = NULL;
 const skin_desc_t* skinverwaltung_t::editfield = NULL;
@@ -97,7 +98,7 @@ static special_obj_tpl<skin_desc_t> const misc_objekte[] = {
 
 static special_obj_tpl<skin_desc_t> const menu_objekte[] = {
 	// new menu system
-	{ &skinverwaltung_t::button,            "Button"   },
+	{ &skinverwaltung_t::button,            "Button"       },
 	{ &skinverwaltung_t::round_button,      "Roundbutton"  },
 	{ &skinverwaltung_t::check_button,      "Checkbutton"  },
 	{ &skinverwaltung_t::posbutton,         "Posbutton"    },
@@ -106,12 +107,13 @@ static special_obj_tpl<skin_desc_t> const menu_objekte[] = {
 	{ &skinverwaltung_t::editfield,         "Editfield"    },
 	{ &skinverwaltung_t::listbox,           "Listbox"      },
 	{ &skinverwaltung_t::back,              "Back"         },
-	{ &skinverwaltung_t::display_text_label,"DisplayTextLabel"},
 	{ &skinverwaltung_t::gadget,            "Gadget"       },
-	{ &skinverwaltung_t::tool_icons_general, "GeneralTools" },
-	{ &skinverwaltung_t::tool_icons_simple,  "SimpleTools"  },
-	{ &skinverwaltung_t::tool_icons_dialoge, "DialogeTools" },
-	{ &skinverwaltung_t::tool_icons_toolbars,"BarTools"     },
+	{ &skinverwaltung_t::tool_icons_general,    "GeneralTools" },
+	{ &skinverwaltung_t::tool_icons_simple,     "SimpleTools"  },
+	{ &skinverwaltung_t::tool_icons_dialoge,    "DialogeTools" },
+	{ &skinverwaltung_t::tool_icons_toolbars,   "BarTools"     },
+	{ &skinverwaltung_t::display_text_label,    "DisplayTextLabel"    },
+	{ &skinverwaltung_t::display_station_label, "DisplayStationLabel" },
 	{ NULL, NULL }
 };
 

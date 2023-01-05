@@ -1653,38 +1653,67 @@ void grund_t::display_obj_fg(const sint16 xpos, const sint16 ypos, const bool is
 	}
 }
 
+
 /**
  * Display a theme defined label with some text
  */
-void display_themed_text_label(sint16 xpos, sint16 ypos, const char* text, const player_t *player, bool dirty)
+void display_themed_label(sint16 xpos, sint16 ypos, const char* text,
+                          sint32 margin_left, sint32 margin_right,
+                          sint32 margin_top, sint32 margin_bottom,
+                          const stretch_map_t &label,
+                          sint32 color, const player_t *player, bool dirty)
+{
+        sint16 text_width = proportional_string_width(text);
+        sint16 label_height = LINESPACE + margin_top + margin_bottom; 
+
+        const scr_rect area(xpos, ypos, 
+                            text_width + margin_left + margin_right, 
+                            label_height);
+
+        const sint16 pnr = player ? player->get_player_nr() : 1;
+        display_img_stretch(label, area, pnr);        
+
+        if(color >= 0) {
+                // a fixed PIXVAL
+                display_proportional_rgb(area.x+margin_left, area.y+margin_top, text, ALIGN_LEFT, color, dirty);
+        } else {
+                // a player color brightness value
+                sint16 pc = player ? player->get_player_color1()+(-color) : SYSCOL_TEXT_HIGHLIGHT;
+                display_proportional_clip_rgb(area.x+margin_left, area.y+margin_top, text, ALIGN_LEFT, color_idx_to_rgb(pc), dirty);
+        }
+}
+
+
+/**
+ * Display a theme defined label with some text
+ */
+void display_themed_text_label(sint16 xpos, sint16 ypos, const char* text, 
+                               const player_t *player, char flag, bool dirty)
 {
         if(skinverwaltung_t::display_text_label) {
-
-                // Hajo: Theme has a label background, display it and then then text
-                sint16 text_width = proportional_string_width(text);
-                sint16 margin_left = gui_theme_t::gui_display_text_label_margin_left;
-                sint16 margin_right = gui_theme_t::gui_display_text_label_margin_right;
-                sint16 margin_top = gui_theme_t::gui_display_text_label_margin_top;
-                sint16 margin_bottom = gui_theme_t::gui_display_text_label_margin_bottom;
-                sint16 label_height = LINESPACE + margin_top + margin_bottom; 
-                
-                const scr_rect area(xpos, ypos, 
-                                    text_width + margin_left + margin_right, 
-                                    label_height);
-
-                sint16 pnr = player ? player->get_player_nr() : 0;
-
-                display_img_stretch(gui_theme_t::display_text_label, area, pnr);
-
-                sint32 color = gui_theme_t::gui_display_text_label_color;
-
-                if(color >= 0) {
-                        // a fixed PIXVAL
-                        display_proportional_rgb(area.x+margin_left, area.y+margin_top, text, ALIGN_LEFT, color, dirty);
-                } else {
-                        // a player color brightness value
-                        sint16 pc = player ? player->get_player_color1()+(-color) : SYSCOL_TEXT_HIGHLIGHT;
-                        display_proportional_clip_rgb(area.x+margin_left, area.y+margin_top, text, ALIGN_LEFT, color_idx_to_rgb(pc), dirty);
+                switch(flag)
+                {
+                        case 'H':       // Hajo: a stop or station
+                               display_themed_label(xpos, ypos, text,
+                                                    gui_theme_t::gui_display_station_label_margin_left,
+                                                    gui_theme_t::gui_display_station_label_margin_right,
+                                                    gui_theme_t::gui_display_station_label_margin_top,
+                                                    gui_theme_t::gui_display_station_label_margin_bottom,
+                                                    gui_theme_t::display_station_label,
+                                                    gui_theme_t::gui_display_station_label_color,
+                                                    player,
+                                                    dirty); 
+                                break;
+                        default:
+                               display_themed_label(xpos, ypos, text,
+                                                    gui_theme_t::gui_display_text_label_margin_left,
+                                                    gui_theme_t::gui_display_text_label_margin_right,
+                                                    gui_theme_t::gui_display_text_label_margin_top,
+                                                    gui_theme_t::gui_display_text_label_margin_bottom,
+                                                    gui_theme_t::display_text_label,
+                                                    gui_theme_t::gui_display_text_label_color,
+                                                    player,
+                                                    dirty); 
                 }
         }
 }
@@ -1693,7 +1722,7 @@ void display_themed_text_label(sint16 xpos, sint16 ypos, const char* text, const
 /**
  * Display text label in player colors using different styles set by env_t::show_names
  */
-void display_text_label(sint16 xpos, sint16 ypos, const char* text, const player_t *player, bool dirty)
+void display_text_label(sint16 xpos, sint16 ypos, const char* text, const player_t *player, char flag, bool dirty)
 {
         const sint16 pc = player ? player->get_player_color1()+4 : SYSCOL_TEXT_HIGHLIGHT;
         const int style = env_t::show_names >> 2;
@@ -1711,7 +1740,7 @@ void display_text_label(sint16 xpos, sint16 ypos, const char* text, const player
                         break;
                 }
                 case 3:
-                        display_themed_text_label(xpos, ypos, text, player, dirty);
+                        display_themed_text_label(xpos, ypos, text, player, flag, dirty);
                         break;
         }
 }
@@ -1733,7 +1762,9 @@ void grund_t::display_overlay(const sint16 xpos, const sint16 ypos)
 
 			const player_t* owner = get_label_owner();
 
-			display_text_label(new_xpos, ypos, text, owner, dirty);
+                        char flag = is_halt() ? 'H' : 'M';
+                        
+			display_text_label(new_xpos, ypos, text, owner, flag, dirty);
 		}
 
 		// display station waiting information/status
@@ -1766,9 +1797,9 @@ void grund_t::display_overlay(const sint16 xpos, const sint16 ypos)
 						const sint16 raster_tile_width = get_tile_raster_width();
 						const sint16 width = proportional_string_width( text )+7;
 						sint16 new_xpos = xpos - (width-raster_tile_width)/2;
-						display_text_label( new_xpos, ypos, text, fab->get_owner(), dirty );
+						display_text_label(new_xpos, ypos, text, fab->get_owner(), 'F', dirty);
 						// ... and status
-						fab->display_status( xpos, ypos );
+						fab->display_status(xpos, ypos);
 					}
 				}
 			}
