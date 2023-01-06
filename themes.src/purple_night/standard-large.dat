@@ -142,6 +142,19 @@ Image[5]=> display_text_label.1.2
 Image[6]=> display_text_label.2.0
 Image[7]=> display_text_label.2.1
 Image[8]=> display_text_label.2.2
+--
+Obj=menu
+name=DisplayStationLabel
+Image[0]=> display_station_label.0.0
+Image[1]=> display_station_label.0.1
+Image[2]=> display_station_label.0.2
+Image[3]=> display_station_label.1.0
+Image[4]=> display_station_label.1.1
+Image[5]=> display_station_label.1.2
+Image[6]=> display_station_label.2.0
+Image[7]=> display_station_label.2.1
+Image[8]=> display_station_label.2.2
+--
 #################################################################
 #
 # The following control only have one (or three) images, and are not stretchable
