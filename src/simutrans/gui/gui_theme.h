@@ -288,6 +288,8 @@ public:
 	static scr_coord_val gui_hspace;
 	static scr_coord_val gui_vspace;
 	static scr_coord_val gui_waitingbar_width;
+	static scr_coord_val gui_display_text_label_height;
+	static scr_coord_val gui_display_text_label_margin;
 
 	// one special entries, since there are lot of lists with files/fonts/paks/... where zero spacing could fit more entires on the screen
 	static scr_coord_val gui_filelist_vspace;
@@ -305,6 +307,7 @@ public:
 	static stretch_map_t editfield;
 	static stretch_map_t listbox;
 	static stretch_map_t windowback;
+	static stretch_map_t display_text_label;
 
 	// those are the normal, selected and disabled simple buttons
 	static image_id arrow_button_left_img[3];

@@ -79,12 +79,12 @@ gui_color_chart_lines_zero = #005C9E
 gui_color_chart_lines_odd = #373630
 gui_color_chart_lines_even = #373630
 
-gui_color_list_background_even = #adadad
-gui_color_list_background_odd = #bfbfbf
 gui_color_list_text_selected_focus = #FAFAFA
 gui_color_list_text_selected_nofocus = #FAFAFA
 gui_color_list_background_selected_focus = #72B2DD
 gui_color_list_background_selected_nofocus = #72B2DD
+gui_color_list_background_even = #adadad
+gui_color_list_background_odd = #bfbfbf
 
 gui_color_button_text = #001020
 gui_color_button_text_disabled = #666666
@@ -117,9 +117,13 @@ cursor_overlay_color = #ff0000
 gui_color_loadingbar_progress = #76b9e6
 gui_color_loadingbar_inner = #D6ECF7
 
-# Color player brigth
+# Color player bright
 gui_player_color_dark = 1	
 gui_player_color_bright = 3
+
+# station labels
+gui_display_text_label_height = 18
+gui_display_text_label_margin = 6
 
 # make the chat window transparent in network games
 gui_chat_window_network_transparency = 25
