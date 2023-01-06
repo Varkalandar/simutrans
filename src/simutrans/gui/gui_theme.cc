@@ -136,6 +136,8 @@ stretch_map_t gui_theme_t::listbox;
 stretch_map_t gui_theme_t::windowback;
 stretch_map_t gui_theme_t::display_text_label;
 stretch_map_t gui_theme_t::display_station_label;
+stretch_map_t gui_theme_t::gui_title_bar;
+stretch_map_t gui_theme_t::gui_title_bar_player;
 
 // and the simple buttons
 image_id gui_theme_t::arrow_button_left_img[3];
@@ -252,6 +254,8 @@ void gui_theme_t::init_gui_defaults()
         // Hajo: these must be cleared before a new theme can be loaded
         skinverwaltung_t::display_text_label = NULL;         
         skinverwaltung_t::display_station_label = NULL;         
+        skinverwaltung_t::title_bar = NULL;         
+        skinverwaltung_t::title_bar_player = NULL;         
         
 	gui_drop_shadows     = false;
 
@@ -332,6 +336,8 @@ void gui_theme_t::init_gui_from_images()
                 if(skinverwaltung_t::display_text_label) {
                         display_text_label[j%3][j/3] = skinverwaltung_t::display_text_label->get_image_id(j);
                         display_station_label[j%3][j/3] = skinverwaltung_t::display_station_label->get_image_id(j);
+                        gui_title_bar[j%3][j/3] = skinverwaltung_t::title_bar->get_image_id(j);
+                        gui_title_bar_player[j%3][j/3] = skinverwaltung_t::title_bar_player->get_image_id(j);
                 }
 	}
 

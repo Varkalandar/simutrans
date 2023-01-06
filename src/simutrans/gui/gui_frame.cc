@@ -96,7 +96,13 @@ void gui_frame_t::reset_min_windowsize()
  */
 FLAGGED_PIXVAL gui_frame_t::get_titlecolor() const
 {
-	return owner ? PLAYER_FLAG|color_idx_to_rgb(owner->get_player_color1()+env_t::gui_player_color_dark) : env_t::default_window_title_color;
+        if(skinverwaltung_t::title_bar) {
+                // Hajo: we have themed title bars
+                return owner ? owner->get_player_nr() : env_t::default_window_title_color;                
+        } else {
+                // Hajo: use traditional bar colors
+                return owner ? PLAYER_FLAG|color_idx_to_rgb(owner->get_player_color1()+env_t::gui_player_color_dark) : env_t::default_window_title_color;
+        }
 }
 
 
