@@ -319,6 +319,7 @@ public:
 	static stretch_map_t windowback;
 	static stretch_map_t display_text_label;
 	static stretch_map_t display_station_label;
+	static stretch_map_t display_marker_label;
 	static stretch_map_t gui_title_bar;
 	static stretch_map_t gui_title_bar_player;
 

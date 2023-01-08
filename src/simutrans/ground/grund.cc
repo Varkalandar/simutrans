@@ -1697,17 +1697,14 @@ void display_themed_marker(sint16 xpos, sint16 ypos, const char* text,
 							 gui_theme_t::gui_display_text_label_margin_right,
 							 gui_theme_t::gui_display_text_label_margin_top,
 							 gui_theme_t::gui_display_text_label_margin_bottom,
-							 gui_theme_t::display_text_label,
+							 gui_theme_t::display_marker_label,
 							 gui_theme_t::gui_display_station_label_color,
 							 player,
 							 dirty);
-	// the root part
-	display_color_img(skinverwaltung_t::display_marker_label->get_image_id(9),
-					  xpos + size.w/2 - 32,
-					  ypos + size.h + yoff,
-					  player->get_player_nr(),
-					  false,
-					  dirty);
+
+	// the extra bottom part
+	const image_id iid = skinverwaltung_t::display_marker_label->get_image_id(9);
+	display_img_aligned(iid, scr_rect(xpos, ypos + size.h + yoff, size.w, 16), ALIGN_CENTER_H, dirty);
 }
 
 
