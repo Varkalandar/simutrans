@@ -28,6 +28,7 @@ const skin_desc_t* skinverwaltung_t::back = NULL;
 const skin_desc_t* skinverwaltung_t::display_text_label = NULL;
 const skin_desc_t* skinverwaltung_t::display_station_label = NULL;
 const skin_desc_t* skinverwaltung_t::display_marker_label = NULL;
+const skin_desc_t* skinverwaltung_t::display_factory_label = NULL;
 const skin_desc_t* skinverwaltung_t::title_bar = NULL;
 const skin_desc_t* skinverwaltung_t::title_bar_player = NULL;
 const skin_desc_t* skinverwaltung_t::scrollbar = NULL;
@@ -118,8 +119,9 @@ static special_obj_tpl<skin_desc_t> const menu_objekte[] = {
 	{ &skinverwaltung_t::display_text_label,    "DisplayTextLabel"    },
 	{ &skinverwaltung_t::display_station_label, "DisplayStationLabel" },
 	{ &skinverwaltung_t::display_marker_label,  "DisplayMarkerLabel"  },
-	{ &skinverwaltung_t::title_bar,              "TitleBar"           },
-	{ &skinverwaltung_t::title_bar_player,       "TitleBarPlayer"     },
+	{ &skinverwaltung_t::display_factory_label, "DisplayFactoryLabel" },
+	{ &skinverwaltung_t::title_bar,             "TitleBar"            },
+	{ &skinverwaltung_t::title_bar_player,      "TitleBarPlayer"      },
 	{ NULL, NULL }
 };
 

@@ -55,6 +55,7 @@ public:
 	static const skin_desc_t* display_text_label;
 	static const skin_desc_t* display_station_label;
 	static const skin_desc_t* display_marker_label;
+	static const skin_desc_t* display_factory_label;
 	static const skin_desc_t* title_bar;
 	static const skin_desc_t* title_bar_player;
 	static const skin_desc_t* scrollbar;

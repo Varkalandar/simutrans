@@ -187,7 +187,7 @@ static int display_gadget_box(sint8 code,
 	if(  img != NULL  ) {
 
 		// Max Kielland: This center the gadget image and compensates for any left/top margins within the image to be backward compatible with older PAK sets.
-		display_img_aligned(img->imageid, scr_rect(x, y, D_GADGET_WIDTH, D_TITLEBAR_HEIGHT), ALIGN_CENTER_H | ALIGN_CENTER_V, false);
+		display_img_aligned(img->imageid, scr_rect(x, y, D_GADGET_WIDTH, D_TITLEBAR_HEIGHT), ALIGN_CENTER_H | ALIGN_CENTER_V, 0, false);
 
 	}
 	else {
@@ -1830,7 +1830,7 @@ void win_display_flush(double konto)
 	}
 
 	if(  skinverwaltung_t::compass_iso  &&  env_t::compass_screen_position  ) {
-		display_img_aligned( skinverwaltung_t::compass_iso->get_image_id( wl->get_settings().get_rotation() ), scr_rect(D_MARGIN_LEFT, env_t::iconsize.h+D_MARGIN_TOP,disp_width-2*4,disp_height- env_t::iconsize.h -D_MARGIN_TOP-D_MARGIN_BOTTOM-win_get_statusbar_height()-(TICKER_HEIGHT)*show_ticker), env_t::compass_screen_position, false );
+		display_img_aligned(skinverwaltung_t::compass_iso->get_image_id( wl->get_settings().get_rotation() ), scr_rect(D_MARGIN_LEFT, env_t::iconsize.h+D_MARGIN_TOP,disp_width-2*4,disp_height- env_t::iconsize.h -D_MARGIN_TOP-D_MARGIN_BOTTOM-win_get_statusbar_height()-(TICKER_HEIGHT)*show_ticker), env_t::compass_screen_position, 0, false);
 	}
 
 	{

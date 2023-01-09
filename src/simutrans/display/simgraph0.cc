@@ -404,7 +404,7 @@ void display_progress(int, int)
 {
 }
 
-void display_img_aligned( const image_id, scr_rect, int, bool )
+void display_img_aligned( const image_id, scr_rect, sint8, int, bool )
 {
 }
 

@@ -386,7 +386,7 @@ void button_t::draw(scr_coord offset)
 		case imagebox:
 			display_img_stretch(gui_theme_t::button_tiles[get_state_offset()], area, 0);
 			display_img_stretch_blend(gui_theme_t::button_color_tiles[b_enabled && pressed], area, (pressed ? text_color: background_color) | TRANSPARENT75_FLAG | OUTLINE_FLAG);
-			display_img_aligned(img, area, ALIGN_CENTER_H | ALIGN_CENTER_V, true);
+			display_img_aligned(img, area, ALIGN_CENTER_H | ALIGN_CENTER_V, 0, true);
 			if (win_get_focus() == this) {
 				draw_focus_rect(area);
 			}
@@ -430,7 +430,7 @@ void button_t::draw(scr_coord offset)
 
 		case square: // checkbox with text
 			{
-				display_img_aligned( gui_theme_t::check_button_img[ get_state_offset() ], area, ALIGN_CENTER_V, true );
+				display_img_aligned(gui_theme_t::check_button_img[ get_state_offset() ], area, ALIGN_CENTER_V, 0, true);
 				if(  text  ) {
 					text_color = b_enabled ? this->text_color : SYSCOL_CHECKBOX_TEXT_DISABLED;
 					scr_rect area_text = area;
@@ -452,26 +452,26 @@ void button_t::draw(scr_coord offset)
 						offset = welt->get_viewport()->is_on_center( gr->get_pos() );
 					}
 				}
-				display_img_aligned( gui_theme_t::pos_button_img[ offset ], area, ALIGN_CENTER_H|ALIGN_CENTER_V, true );
+				display_img_aligned(gui_theme_t::pos_button_img[ offset ], area, ALIGN_CENTER_H|ALIGN_CENTER_V, 0, true);
 			}
 			break;
 
 		case arrowleft:
 		case repeatarrowleft:
-			display_img_aligned( gui_theme_t::arrow_button_left_img[ get_state_offset() ], area, ALIGN_CENTER_H|ALIGN_CENTER_V, true );
+			display_img_aligned(gui_theme_t::arrow_button_left_img[ get_state_offset() ], area, ALIGN_CENTER_H|ALIGN_CENTER_V, 0, true);
 			break;
 
 		case arrowright:
 		case repeatarrowright:
-			display_img_aligned( gui_theme_t::arrow_button_right_img[ get_state_offset() ], area, ALIGN_CENTER_H|ALIGN_CENTER_V, true );
+			display_img_aligned(gui_theme_t::arrow_button_right_img[ get_state_offset() ], area, ALIGN_CENTER_H|ALIGN_CENTER_V, 0, true);
 			break;
 
 		case arrowup:
-			display_img_aligned( gui_theme_t::arrow_button_up_img[ get_state_offset() ], area, ALIGN_CENTER_H|ALIGN_CENTER_V, true );
+			display_img_aligned(gui_theme_t::arrow_button_up_img[ get_state_offset() ], area, ALIGN_CENTER_H|ALIGN_CENTER_V, 0, true);
 			break;
 
 		case arrowdown:
-			display_img_aligned( gui_theme_t::arrow_button_down_img[ get_state_offset() ], area, ALIGN_CENTER_H|ALIGN_CENTER_V, true );
+			display_img_aligned(gui_theme_t::arrow_button_down_img[ get_state_offset() ], area, ALIGN_CENTER_H|ALIGN_CENTER_V, 0, true);
 			break;
 
 		default: ;

@@ -1658,10 +1658,10 @@ void grund_t::display_obj_fg(const sint16 xpos, const sint16 ypos, const bool is
  * Display a theme defined label with some text
  */
 scr_size display_themed_label(sint16 xpos, sint16 ypos, const char* text,
-                          sint32 margin_left, sint32 margin_right,
-                          sint32 margin_top, sint32 margin_bottom,
-                          const stretch_map_t &label,
-                          sint32 color, const player_t *player, bool dirty)
+                              sint32 margin_left, sint32 margin_right,
+                              sint32 margin_top, sint32 margin_bottom,
+                              const stretch_map_t &label,
+                              sint32 color, const player_t *player, bool dirty)
 {
 	sint16 text_width = proportional_string_width(text);
 	sint16 label_height = LINESPACE + margin_top + margin_bottom; 
@@ -1693,18 +1693,19 @@ void display_themed_marker(sint16 xpos, sint16 ypos, const char* text,
 	
 	const scr_size size =
 		display_themed_label(xpos-2, ypos+yoff, text,
-							 gui_theme_t::gui_display_text_label_margin_left,
-							 gui_theme_t::gui_display_text_label_margin_right,
-							 gui_theme_t::gui_display_text_label_margin_top,
-							 gui_theme_t::gui_display_text_label_margin_bottom,
+							 gui_theme_t::gui_display_marker_label_margin_left,
+							 gui_theme_t::gui_display_marker_label_margin_right,
+							 gui_theme_t::gui_display_marker_label_margin_top,
+							 gui_theme_t::gui_display_marker_label_margin_bottom,
 							 gui_theme_t::display_marker_label,
-							 gui_theme_t::gui_display_station_label_color,
+							 gui_theme_t::gui_display_marker_label_color,
 							 player,
 							 dirty);
 
 	// the extra bottom part
+	const sint8 pnr = player ? player->get_player_nr() : 1;
 	const image_id iid = skinverwaltung_t::display_marker_label->get_image_id(9);
-	display_img_aligned(iid, scr_rect(xpos, ypos + size.h + yoff, size.w, 16), ALIGN_CENTER_H, dirty);
+	display_img_aligned(iid, scr_rect(xpos, ypos + size.h + yoff, size.w, 16), ALIGN_CENTER_H, pnr, dirty);
 }
 
 
@@ -1726,6 +1727,17 @@ void display_themed_text_label(sint16 xpos, sint16 ypos, const char* text,
 									 gui_theme_t::gui_display_station_label_margin_bottom,
 									 gui_theme_t::display_station_label,
 									 gui_theme_t::gui_display_station_label_color,
+									 player,
+									 dirty); 
+					break;
+			case 'F':       // Hajo: a factory
+				display_themed_label(xpos, ypos, text,
+									 gui_theme_t::gui_display_factory_label_margin_left,
+									 gui_theme_t::gui_display_factory_label_margin_right,
+									 gui_theme_t::gui_display_factory_label_margin_top,
+									 gui_theme_t::gui_display_factory_label_margin_bottom,
+									 gui_theme_t::display_factory_label,
+									 gui_theme_t::gui_display_factory_label_color,
 									 player,
 									 dirty); 
 					break;
@@ -1790,8 +1802,9 @@ void grund_t::display_overlay(const sint16 xpos, const sint16 ypos)
 			int new_xpos = xpos - (width-raster_tile_width)/2;
 
 			const player_t* owner = get_label_owner();
-
-            char flag = is_halt() ? 'H' : 'M';
+			label_t *label = find<label_t>();
+			
+            char flag = (label) ? 'M' : (is_halt()) ? 'H' : 'T';
                         
 			display_text_label(new_xpos, ypos, text, owner, flag, dirty);
 		}

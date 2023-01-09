@@ -2848,7 +2848,7 @@ static void display_img_nc(scr_coord_val h, const scr_coord_val xp, const scr_co
 
 
 // only used for GUI
-void display_img_aligned( const image_id n, scr_rect area, int align, const bool dirty)
+void display_img_aligned(const image_id n, scr_rect area, int align, sint8 player_nr_raw, const bool dirty)
 {
 	if(  n < anz_images  ) {
 		scr_coord_val x,y;
@@ -2873,7 +2873,7 @@ void display_img_aligned( const image_id n, scr_rect area, int align, const bool
 			y = area.get_bottom() - images[n].y - images[n].h;
 		}
 
-		display_color_img( n, x, y, 0, false, dirty  CLIP_NUM_DEFAULT);
+		display_color_img( n, x, y, player_nr_raw, false, dirty  CLIP_NUM_DEFAULT);
 	}
 }
 
