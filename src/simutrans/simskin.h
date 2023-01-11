@@ -54,6 +54,8 @@ public:
 	static const skin_desc_t* back;
 	static const skin_desc_t* display_text_label;
 	static const skin_desc_t* display_station_label;
+	static const skin_desc_t* display_marker_label;
+	static const skin_desc_t* display_factory_label;
 	static const skin_desc_t* scrollbar;
 	static const skin_desc_t* divider;
 	static const skin_desc_t* editfield;

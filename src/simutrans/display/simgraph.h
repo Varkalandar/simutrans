@@ -166,7 +166,7 @@ void display_scroll_band( const scr_coord_val start_y, const scr_coord_val x_off
 void display_set_player_color_scheme(const int player, const uint8 col1, const uint8 col2 );
 
 // only used for GUI, display image inside a rect
-void display_img_aligned( const image_id n, scr_rect area, int align, const bool dirty);
+void display_img_aligned(const image_id n, scr_rect area, int align, sint8 player_nr_raw, const bool dirty);
 
 // display image with day and night change
 void display_img_aux(const image_id n, scr_coord_val xp, scr_coord_val yp, const signed char player_nr, const bool daynight, const bool dirty  CLIP_NUM_DEF);
