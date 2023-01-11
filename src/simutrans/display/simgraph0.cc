@@ -404,11 +404,11 @@ void display_progress(int, int)
 {
 }
 
-void display_img_aligned( const image_id, scr_rect, sint8, int, bool )
+void display_img_aligned(const image_id, scr_rect, int, sint8, bool)
 {
 }
 
-void display_proportional_ellipsis_rgb( scr_rect, const char *, int, PIXVAL, bool, bool, PIXVAL)
+void display_proportional_ellipsis_rgb(scr_rect, const char *, int, PIXVAL, bool, bool, PIXVAL)
 {
 }
 
