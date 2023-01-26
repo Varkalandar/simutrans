@@ -2169,7 +2169,7 @@ bool karte_t::change_player_tool(uint8 cmd, uint8 player_nr, uint16 param, bool 
 }
 
 
-void karte_t::set_tool_api( tool_t *tool_in, player_t *player, bool& suspended, bool called_from_script)
+void karte_t::set_tool_api( tool_t *tool_in, player_t *player, bool& suspended)
 {
 	suspended = false;
 	if(  get_random_mode()&LOAD_RANDOM  ) {
@@ -2191,7 +2191,9 @@ void karte_t::set_tool_api( tool_t *tool_in, player_t *player, bool& suspended, 
 	}
 	tool_in->flags |= (event_get_last_control_shift() ^ tool_t::control_invert);
 	if(!env_t::networkmode  ||  tool_in->is_local_execution()  ||  tool_in->is_init_keeps_game_state()  ) {
-		if (called_from_script  ||  tool_in->is_init_keeps_game_state()) {
+
+		if (tool_in->is_init_keeps_game_state()  ||  (get_random_mode() & INTERACTIVE_RANDOM) == 0) {
+			// network safe or not during sync_step: call directly
 			local_set_tool(tool_in, player);
 		}
 		else {
@@ -2574,60 +2576,6 @@ stadt_t *karte_t::find_nearest_city(const koord k) const
 		}
 	}
 	return best;
-}
-
-
-// -------- Verwaltung von synchronen Objekten ------------------
-
-void karte_t::sync_list_t::add(sync_steppable *obj)
-{
-	assert(!sync_step_running);
-	list.append(obj);
-}
-
-void karte_t::sync_list_t::remove(sync_steppable *obj)
-{
-	if(sync_step_running) {
-		if (obj == currently_deleting) {
-			return;
-		}
-		assert(false);
-	}
-	else {
-		list.remove(obj);
-	}
-}
-
-void karte_t::sync_list_t::clear()
-{
-	list.clear();
-	currently_deleting = NULL;
-	sync_step_running = false;
-}
-
-void karte_t::sync_list_t::sync_step(uint32 delta_t)
-{
-	sync_step_running = true;
-	currently_deleting = NULL;
-
-	for(uint32 i=0; i<list.get_count();i++) {
-		sync_steppable *ss = list[i];
-		switch(ss->sync_step(delta_t)) {
-			case SYNC_OK:
-				break;
-			case SYNC_DELETE:
-				currently_deleting = ss;
-				delete ss;
-				currently_deleting = NULL;
-				/* fall-through */
-			case SYNC_REMOVE:
-				ss = list.pop_back();
-				if (i < list.get_count()) {
-					list[i] = ss;
-				}
-		}
-	}
-	sync_step_running = false;
 }
 
 
@@ -3313,7 +3261,7 @@ void karte_t::step()
 		tool_t *tmp_tool = create_tool( TOOL_ADD_MESSAGE | GENERAL_TOOL );
 		tmp_tool->set_default_param( buf );
 		bool suspended;
-		call_work_api(tmp_tool, get_active_player(), koord3d::invalid, suspended, false);
+		call_work_api(tmp_tool, get_active_player(), koord3d::invalid, suspended);
 		// work is done (or command sent), it is safe to delete immediately
 		delete tmp_tool;
 	}
@@ -4538,7 +4486,7 @@ void karte_t::rdwr_gamestate(loadsave_t *file, loadingscreen_t *ls)
 					sint8 slope;
 					file->rdwr_byte(slope);
 					// convert slopes from old single height saved game
-					slope = encode_corners(scorner_sw(slope), scorner_se(slope), scorner_ne(slope), scorner_nw(slope)) * env_t::pak_height_conversion_factor;
+					slope = slope_from_slope4(slope4_t(slope), env_t::pak_height_conversion_factor);
 					access_nocheck(x, y)->get_kartenboden()->set_grund_hang(slope);
 				}
 			}
@@ -5702,7 +5650,7 @@ void karte_t::network_game_set_pause(bool pause_, uint32 syncsteps_)
 }
 
 
-const char* karte_t::call_work_api(tool_t *tool, player_t *player, koord3d pos, bool &suspended, bool called_from_api )
+const char* karte_t::call_work_api(tool_t *tool, player_t *player, koord3d pos, bool &suspended)
 {
 	suspended = false;
 	const char *err = NULL;
@@ -5720,7 +5668,8 @@ const char* karte_t::call_work_api(tool_t *tool, player_t *player, koord3d pos, 
 			}
 		}
 		if (err == NULL) {
-			if (called_from_api  ||  network_safe_tool) {
+			if (network_safe_tool  ||  (get_random_mode() & INTERACTIVE_RANDOM) == 0) {
+				// call work if it would not affect game state or if the call is not during sync_step
 				err = tool->work(player, pos);
 				suspended = false;
 			}
@@ -6093,7 +6042,6 @@ bool karte_t::interactive(uint32 quit_month)
 				tool->flags = next_deferred_move_flags;
 				tool->move(active_player, true, target);
 				tool->flags = 0;
-				next_deferred_move_flags = 0;
 			}
 			else if (two_click_tool_t *tct = dynamic_cast<two_click_tool_t*>(tool)) {
 				// remove preview images
@@ -6101,6 +6049,8 @@ bool karte_t::interactive(uint32 quit_month)
 					tct->cleanup(false);
 				}
 			}
+			next_deferred_move_to = koord3d::invalid;
+			next_deferred_move_flags = 0;
 		}
 
 		if(  env_t::networkmode  ) {
